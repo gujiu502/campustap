@@ -1,0 +1,10 @@
+<resources>
+    <string name="campus_test_service">CampusTap 自有測試服務（非門禁憑證）</string>
+    <style name="CampusTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#0969DA</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">#F6F8FA</item>
+    </style>
+</resources>
