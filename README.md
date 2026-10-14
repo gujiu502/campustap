@@ -1,75 +1,76 @@
-# CampusTap — Redmi 學生證實機診斷工程
+# CampusTap — 学生证门禁测试与卡片界面
 
-更新：2026-10-15（Asia/Kuala_Lumpur）。**診斷 APK 已編譯並曾安裝完成實機讀卡；手機代替學生證開門／加入原實體悠遊卡未完成，狀態 BLOCKED。使用者要求「不能就算了」後已停止，診斷 App 已從手機移除，電腦保留原碼、APK 與證據。**
+更新：2026-10-15，当前版本 `0.4.0-access-ui`，本地 debug APK。**代码、模板 UI 已实现；新版本尚未安装到 Redmi，门禁设置成功与实际开门尚待明天真机测试。** 用户已拔走手机，不把编译成功当成开门成功。
 
-## 核心結果
+## 当前功能与证据
 
-使用者的 Redmi Note 14 Pro+ 5G（24115RA8EG、Global `OS2.0.2.0.VOPMIXM`、Android 15）實際讀到原雙功能學生證，技術為 MIFARE Classic / NFC-A，未宣告 ISO-DEP。普通 Android HostApduService 僅支援 ISO-DEP/APDU，不能直接取代原卡協定。完整理由、實機證據、OEM／校方替代路線見 [可行性報告](docs/feasibility.md)。
+- Redmi `24115RA8EG` / `amethyst` / `OS2.0.2.0.VOPMIXM` / Android 15，锁定 bootloader。之前实际读到本人学生证为 NFC-A / MIFARE Classic，UID 长度 4、ATQA `[4,0]`、SAK `8`。不读取扇区、密钥、余额或交易。
+- 手机原生 ST 扩展库可从 App 加载；用户启用 USB 调试安全设置后，ADB 已授予 `WRITE_SECURE_SETTINGS`。只读配置成功不代表参数写入或门禁认证成功。
+- `0.3.0` 已安装并加密录入实卡。用户现场测试报告“设定失败”。旧版未记录确切失败阶段；最后可见文件没有恢复快照或启用成功记录，具体原因仍未确认。
+- 新版逐步记录设备、权限、卡片解密、原配置读取、基线检查、恢复快照、设置及回读的失败；持久保存最近错误。分享仅输出步骤、代号、异常类型，不输出原异常消息或完整 UID。
+- 写入前加密保存并解密核验原配置。设置异常、成功后报告保存异常、离开诊断页及两分钟计时结束均尝试恢复，并核对控制器数据、已快照 NCI 参数与用户默认路由。失败保留恢复文件；重新开 App 进入恢复页。
+- 严格限制到已核验型号与 ROM、NFC 开启和 ADB 授权。原配置不符或读回 `null` 时拒绝写入，不把 `null` 当空数组放宽检查。
 
-使用者確認另一台 realme 是透過系統錢包門禁卡錄入成功。本 Redmi 已裝小米錢包，但缺少 `com.miui.tsmclient` 門卡元件，暫未找到經核驗的官方開通途徑。這是目前這台手機的檢查結果，不是所有小米手機的永久能力判斷。
+这是有限的设备参数测试，只尝试卡号识别，没有 MIFARE Classic 密钥认证实现。设置回读通过仍需本人到有权使用的门禁现场测试。
 
-使用者最後澄清：要添加原實體悠遊卡，不要操作現有悠遊付；官方嗶乘車不是本次需求。本次從未開啟或操作悠遊付，未新增卡片、開通帳戶、改付款角色或執行交易。[悠遊卡研究資料](docs/easycard-feasibility.md)僅保留為方案差異的參考，不是已執行的整合。
+## 按模板实现的界面
 
-## 來源與版本
+参考用户 `NFC_Card_App_UI_Design_Spec.md` 与三屏图，视觉规范见 [DESIGN.md](DESIGN.md)。
 
-本專案是 [Google/AOSP CardEmulation](https://github.com/googlearchive/android-CardEmulation) 的本機 Git clone / 衍生工程，保留 upstream 歷史，並非建立公有 GitHub fork。上游 SHA `167556ae24fd9ffe378715aa13bc197c9ca44361`，Apache-2.0，見 [LICENSE](LICENSE) 及 [選型記錄](research/repo-comparison.md)。沒有公開上傳私人設備或卡片資料。
+- 我的卡片：浅色背景、右上蓝色圆形 `+`、实体卡比例 1.586、圆角与预设徽章，底部“我的卡片／使用纪录／设定”。只显示已保存卡片，不预装假凭证。
+- 新增面板：贴底显示门禁卡、学生证、交通卡、自订卡片。门禁卡进入实卡读取；学生证与自订卡片创建外观；交通卡明确提示原实体悠游卡加入未支持。
+- 编辑：名称、缩略图、系统选图器、自动中心裁切、手动拖动与缩放、预设选择、保存及删除。按保存后持久化；返回可放弃草稿。图片缩小后复制到 App 私有目录，不上传。
+- 预设：只能将已录入的门卡选为本 App 测试卡，同一时间一个选择；不冒充系统默认 NFC 卡，不改变付款钱包。仅外观卡的 NFC 开关禁用。
+- 使用纪录：显示最近一次设置、恢复、失败报告，均标明开门未验证，不制造刷卡成功历史。
 
-工具鏈：JDK 17、Gradle 8.13（校驗碼已固定）、AGP 8.13.2、Android compile/target SDK 35、min SDK 31。Runtime 只依賴 Android 平台；JUnit 4.13.2 僅用於 JVM 測試。APK 是 debug 簽名的本地診斷版，不是正式門卡／儲值支付產品。
+默认卡面使用内置校园建筑插画，不伪造校徽；可换自己的图片。卡面存在不等于具备 NFC 功能。
 
-## 實作範圍
+## 来源、工具链与文件
 
-單頁原生 Android UI（繁中）：真實 NFC/HCE 狀態、NFC 與付款設定入口、限時只讀卡種偵測、合成 HCE 測試、官方悠遊付啟動入口、去識別化報告分享與診斷清除。第一次開啟且 NFC on 時自動只讀偵測一次，30 秒超時；離開前景或偵測結束時退出 reader mode。
+基于 [Google/AOSP CardEmulation](https://github.com/googlearchive/android-CardEmulation) 的本地 clone，保留 Apache-2.0 与 Git 历史。上游 SHA `167556ae24fd9ffe378715aa13bc197c9ca44361`，见 [LICENSE](LICENSE) 与 [选型记录](research/repo-comparison.md)。没有上传私人设备或卡片数据。
 
-只讀學生證時呼叫公開 Tag 技術資訊與 NFC-A SAK/ATQA，不讀卡內扇區、金鑰、餘額或交易資料。不儲存完整 UID、UID hash、學生姓名／學號。手動「測試另一部 CampusTap」才對自有測試裝置送合成 SELECT；必須先移開學生證。
+JDK 17 / Gradle 8.13 / AGP 8.13.2 / compile、target 35 / min 31。Runtime 只依赖 Android 平台；JUnit 4.13.2 仅用于测试。未将设备 OEM 二进制打进 APK，共享库为可选声明。
 
-HCE 的唯一 AID 是 `F043414D505553`，類別 `other`，只傳回 `CAMPUS_TEST_ONLY` + `9000`；不處理付款 AID，不可修改帳號／UID 冒充門卡。示例服務要求亮屏及解鎖；背景、鎖屏、熄屏等行為不能冒充實測。
-
-## 檔案職責與介面
-
-| 檔案 | 職責 |
+| 文件 | 职责 |
 |---|---|
-| `Application/src/main/java/.../MainActivity.java` | 公開 API 設備診斷、ReaderCallback、30 秒限時與前景生命週期、設定與官方 App 入口、私有 JSON |
-| `CardTechnology.java` | 依系統技術清單分類，不推斷門禁金鑰／支付餘額 |
-| `TestProtocol.java` | 合成 SELECT 解析與固定回應，未知或格式錯誤 APDU 拒絕 |
-| `CardService.java` | 保留上游 HostApduService 架構，只呼叫合成協定；不保存 APDU |
-| `Application/src/main/AndroidManifest.xml` | NFC 權限、HCE service、BIND_NFC_SERVICE、必要 package visibility |
-| `Application/src/main/res/xml/aid_list.xml` | 唯一合成非付款 AID 路由 |
-| `Application/src/test/.../TestProtocolTest.java` | 解析邊界與協定／卡種分類回歸 |
-| `tools/collect_device_info.ps1` | 指定/唯一 ADB 設備、驗證 Redmi 型號、僅保存白名單設備欄位 |
-| `tools/build.ps1` | ASCII 臨時映射、build/unit/lint、finally 移除映射 |
-| `tools/deploy.ps1` | 指定序號與驗證型號後安裝、啟動診斷 APK |
-| `artifacts/` | gitignored 設備 JSON、實機截圖、測試報告、APK與校驗碼 |
+| `CardsActivity.java` | 三项导航、新增面板、编辑和系统选图器 |
+| `CardAppearance.java` / `CardStore.java` / `CardFace.java` | 外观数据、唯一 App 预设、卡面与裁切 |
+| `MainActivity.java` | 实卡只读、测试入口、限时与生命周期、恢复及脱敏诊断 |
+| `AccessCardProfile.java` / `PrivateState.java` | 限制实际卡形态、AndroidKeyStore AES-GCM 私有存储 |
+| `VendorProbe.java` | 只读探测，UID 与历史字节只输出长度，区分空参数与无返回 |
+| `VendorCardController.java` / `RadioConfiguration.java` / `VendorFailure.java` | 快照、严格检查、受控设置、恢复回读与错误代号 |
+| `CardService.java` / `TestProtocol.java` | 合成 HCE，AID `F043414D505553` / CATEGORY_OTHER，不处理支付 |
+| `tools/build.ps1` / `tools/deploy.ps1` | 编译／单元／lint；指定设备并核验型号后安装 |
+| `artifacts/` | gitignored APK、校验码与私人诊断证据 |
 
-JSON `capability.json` 包含 NFC/HCE/ROM、官方 App 安裝狀態、錢包角色可用性與未開通門禁狀態。`card_probe.json` 包含技術清單、SAK/ATQA、UID 長度和只讀旗標。`reader_test.json`（只在自有 Reader 測試後產生）包含合成測試 PASS/FAIL，不包含回應封包。
+## 构建、安装与明天测试
 
-## 可重現命令
-
-從此專案根目錄用 PowerShell 執行：
+从 `CampusTap` 目录执行：
 
 ```powershell
-# 需 Git、JDK 17、Android SDK 35、adb；手機已授權 USB 偵錯。
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\collect_device_info.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build.ps1
-# SERIAL 只在本機 adb devices -l 取得，不寫入可公開報告。
+adb devices -l
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 -Serial SERIAL
+# 仅在 App 显示权限缺失时，对指定 Redmi 重新授权：
+adb -s SERIAL shell pm grant tw.campustap.diagnostics android.permission.WRITE_SECURE_SETTINGS
 ```
 
-Build 腳本使用已驗證的本機 `C:\Program Files\Java\jdk-17` 與標準 `%LOCALAPPDATA%\Android\Sdk`，若路徑不同須調整腳本。`X:` 必須空閒；中文路徑曾造成 JVM 測試 classpath 問題，勿只看 APK 成功便略過單元測試。
+`SERIAL` 从当前设备列表取得，不写入公开报告，不误选模拟器。部署使用 `install -r` 保留旧版已加密录入的数据，启动新卡片主页。构建需 `X:` 空闲，完成后自动移除映射。
 
-APK：`artifacts/builds/CampusTap-diagnostics-debug.apk`，SHA-256：同目錄 `SHA256.txt`。亦可由 `Application/build/outputs/apk/debug/Application-debug.apk` 重建取得。建置 metadata 在 `artifacts/builds/build_manifest.json`。
+APK：`artifacts/builds/CampusTap-0.4.0-access-ui-debug.apk`，旁边有 `SHA256.txt`、`build_manifest.json`。本地 debug 签名，不是正式票证发行产品。
 
-## 驗收、限制、回退
+1. 接回同一部 Redmi，更新安装；不要先卸载旧版，以免删除已录入参数。
+2. 确认保存的卡片及待恢复状态；若有恢复文件，先完成恢复核对。
+3. 点“测试门禁”，将实卡移离至少 20 厘米，手动确认启用。失败时保留界面步骤与代号，并分享诊断。
+4. 若控制器回读通过，再用手机单独刷本人有权使用的门禁；保存真实结果，设置成功不等于开门成功。
+5. 按停止并核对恢复通过，再使用 NFC 付款。测试两分钟退出、切换页面、图片编辑与原钱包共存；这些新版真机检查均未运行。
 
-詳見 [測試矩陣](docs/test-matrix.md)。已驗證 USB、公開 NFC/HCE API、原卡只讀、真實 UI、非付款合成 AID 系統登記、三個 JVM 測試與 lint。自有 Reader 實際 HCE 往返、真正門禁開門、付款交易等沒有實測，不推定成功。
+## 状态与恢复限制
 
-真正完成須取得相容、合法的 OEM 或校方手機憑證，並由本人在有權使用的宿舍門禁現場記錄至少十次成功；在此之前 App 永遠不顯示已開門。
+本地编译、14 个 JVM 单元测试及 lint 是交付检查；新 UI 实际运行、选图持久化、两分钟真机恢复与门禁复测 **NOT RUN**。现有模拟器 API 30，低于 min 31，且正在运行用户游戏，没有在该设备安装、切换页面或截图。见 [测试矩阵](docs/test-matrix.md)、[交付关卡](docs/gate-report.md)。
 
-普通 APK 不設定 Android 15 NFC 開機強制啟用、不申請系統特權、不要求常駐服務、不搶 Google/悠遊付付款角色。沒有 root、解鎖 bootloader、刷 ROM 或更改 `/system`。系統預設與支付可用性以實機回歸為準。
+进程被强制停止或系统杀掉时，Activity 计时及离开回调不能保证执行；当前不是无人值守门卡服务。重新开 App 会检测快照并进入恢复页。恢复未通过时保持 NFC 开启，不删除 App、清除数据或撤销权限，先恢复后再付款。解除安装不能代替控制器恢复。
 
-移除診斷版：在 Android 系統解除安裝，或指定正確目標執行 `adb -s SERIAL uninstall tw.campustap.diagnostics`。解除安裝移除本 App 私有診斷與合成 AID，不會刪學生證、票證帳戶或改動使用者現有 App。App 內「清除診斷」只刪此 App 的報告。
+删除录入卡片先恢复再删除 App 加密参数，不写实际学生证。恢复快照不属于可随意清除的日志。代码回退用本地 Git checkpoint；旧上游无法在当前工具链原样构建。
 
-程式回退可用上游 commit，但原上游是舊範例且 JDK 17 無法原樣建置；工程修改已存在本機 Git checkpoint，不要將回退誤當可用門卡版本。
-
-## 後續最小一步
-
-先核驗本 Global 機型的官方智能卡開通支持，或取得校方讀卡機型號及官方手機憑證程序。找到可行路線再接入並做門禁十次驗證。不要擴充被卡種否定的原卡 HCE 仿製路線。
+当前范围：手机自身无 Root 门禁测试、模板 UI。没有 Root、解锁、刷 ROM、找校方或操作悠游付；原实体悠游卡加入未实现。既有可行性研究仅为历史材料，不代表现在执行其建议。

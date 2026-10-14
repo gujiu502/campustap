@@ -1,39 +1,23 @@
-# 交付關卡
+# 当前交付关卡
 
-日期：2026-10-15（Asia/Kuala_Lumpur）。本文件評估實際完成內容，不能以診斷 APK 取代原門禁驗收。
+2026-10-15，版本 `0.4.0-access-ui`。代码及模板 UI 交付；原 Redmi 已由用户拔走，新 APK 未部署。
 
-```text
-STATUS: BLOCKED (actual phone door access); PASS (delivered read-only diagnostic baseline)
-UPSTREAM: https://github.com/googlearchive/android-CardEmulation
-SHA: 167556ae24fd9ffe378715aa13bc197c9ca44361
-LICENSE: Apache-2.0
-CHANGES: local Git checkpoint; exact source commit in artifacts/builds/build_manifest.json
-BUILD: powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build.ps1
-BUILD RESULT: assembleDebug + 3 JVM tests + lint passed
-DEVICE: Redmi 24115RA8EG / Android 15 API 35 / OS2.0.2.0.VOPMIXM
-CARD: MIFARE Classic + NFC-A; not ISO-DEP, repeated read-only observation consistent
-TESTS: install/launch, physical card probe, UI capture, nonpayment AID registration, wallet unchanged
-NOT RUN: RF HCE roundtrip, door unlock, reboot, locked/off-screen, USB disconnect, actual payment
-NFC SWITCH TEST: attempted; ROM denied shell enable/disable permission; NFC remained ON
-RISK: diagnostic debug APK adds only a synthetic CATEGORY_OTHER AID; it cannot open the dormitory
-NEXT: verify official OEM door-card provisioning or obtain a compatible issuer mobile credential
-ROLLBACK: Android uninstall tw.campustap.diagnostics; upstream source retained in Git
-```
+| 关卡 | 状态 | 实际证据 |
+|---|---|---|
+| 上游与授权 | PASS | Google/AOSP CardEmulation，SHA `167556ae24fd9ffe378715aa13bc197c9ca44361`，Apache-2.0 |
+| 原卡识别 | PASS，历史实机 | NFC-A / Classic，4 字节 UID，仅公开识别参数 |
+| OEM 库与授权 | PASS，历史实机 | ST 可选共享库，ADB 已授予开发权限，控制器 91 字节 / UID 长度 0 / SAK 32 |
+| 卡参数加密录入 | PASS，0.3.0 历史实机 | AndroidKeyStore / AES-GCM，回读核验，UID 不导出 |
+| 原设置测试 | FAIL，用户现场报告 | 设定失败；旧版无具体失败阶段，没有开门成功证据 |
+| 失败诊断与回退修正 | IMPLEMENTED | 阶段／参数代号、反射异常类型、快照检查、报告异常分支恢复、持久错误提示；纯逻辑测试 |
+| 模板 UI | IMPLEMENTED | 列表、新增面板、编辑、选图、中心／手动裁切、唯一 App 预设；真实运行 NOT RUN |
+| 构建／单元／lint | 见 build_manifest.json | 14 个 JVM 测试；保留实际构建与 lint 结果 |
+| 新版部署／恢复／门禁 | NOT RUN | 手机已断开，用户要求明天测试 |
+| 新版界面截图 | NOT RUN | 不借用正在运行用户游戏的 API 30 模拟器，也不把其他预览当真机截图 |
+| 原实体悠游卡加入 | NOT IMPLEMENTED | 不操作悠游付，不仿造余额、密钥或支付协议 |
 
-| 階段 | 結果 |
-|---|---|
-| P0 研究與選型 | PASS；官方 API、四個上游及授權比較，有原版 build 失敗證據 |
-| P1 真實設備／卡種探測 | PASS；已讀使用者原卡，報告白名單與去識別化 |
-| P2 HCE POC | PARTIAL；build/install、合成協定單元測試與系統路由通過；缺第二台 Reader，RF 往返 NOT RUN |
-| P3 真實門禁 | BLOCKED；普通 HCE 不相容原卡協定；OEM／校方憑證鏈尚未建立 |
-| P4 NFC 預設與免開 App | PARTIAL；提供設定入口，原付款角色未改；NFC 開關被 ROM 限制；重啟／待機驗收 NOT RUN |
-| P5 品質與交付 | PARTIAL；本診斷版 APK/原碼/文件/單元/lint/原卡探測完成；門禁可靠性不可驗收 |
-| P6 悠遊卡官方路線 | 報告已交付；官方 App 已存在；登入、綁卡、學生票與付款 NOT RUN |
+下一步：用新 APK 捕获 `READ_NCI_*` 或 `CHECK_BASELINE` 的具体错误。如果原参数不同，取得完整可逆配置证据后再改基线，不因设定失败跳过检查。门禁认证与稳定十次开门仍未完成。
 
-**阻礙的證據**：卡種由 Redmi 的 ReaderCallback 實測，並非只憑「學生證」名稱猜測；普通 HCE 支援範圍由 Android 官方文件確認。門卡元件不存在由 pm 查詢確認；沒有推定安裝任意 OEM APK 就能取得系统权限和发卡能力。
+恢复边界：只核对快照过的控制器、NCI 与用户默认路由字段。进程被杀或强制停止不能依赖 Activity 计时恢复，需重新开 App。恢复失败保留快照；完成恢复前不要卸载或清除 App。
 
-診斷的界線：没有嘗試卡片認證、解密、讀扇區、改寫、模擬支付、發送第三方有效憑證、移植私有 SDK、root 或更改 ROM。本地設備報告與 APK 不推送公有遠端。NFC shell 切換與 input tap 各有明確 SecurityException；沒有改開發者安全權限去繞過。
-
-使用者最終澄清要添加原實體悠遊卡、不要操作悠遊付，並要求不可行就停止；已停止後續實作，未開啟或操作悠遊付。
-
-清理：任務擁有的手機 XML/PNG 暫存及 ASCII build 映射在停止前清理；任務開啟的診斷／小米錢包視窗關閉，診斷 App 已解除安裝，電腦保留原碼、APK 與證據。共享 ADB server、SDK/Gradle 快取與原有手機 App 保留。清理結果另存 `artifacts/tests/cleanup.json`，不能以此文件文字代替驗證。
+清理：构建结束不保留 X: 映射，不启动额外后台服务或模型；源码、测试、APK 与有用证据保留。此前无用钱包 APK／截图已移至指定回收箱。手机断开后无法验证旧窗口／暂存，不声称完成手机端清理。原有模拟器及游戏未更改。

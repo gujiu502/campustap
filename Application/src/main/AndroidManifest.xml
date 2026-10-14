@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.NFC" />
+    <!-- This ROM also marks WSS as development; only an explicit ADB grant can enable the probe. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
-    <queries><package android:name="com.easycard.wallet" /><package android:name="com.miui.tsmclient" /></queries>
-    <application android:allowBackup="false" android:dataExtractionRules="@xml/backup_rules" android:label="CampusTap 診斷"
+    <queries><package android:name="com.miui.tsmclient" /></queries>
+    <application android:allowBackup="false" android:dataExtractionRules="@xml/backup_rules" android:label="CampusTap"
         android:icon="@drawable/ic_launcher" android:theme="@style/CampusTheme"
-        android:supportsRtl="true">
-        <activity android:name=".MainActivity" android:exported="true">
+        android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
+        <uses-library android:name="com.st.android.nfc_extensions" android:required="false" />
+        <activity android:name=".MainActivity" android:exported="false" />
+        <activity android:name=".CardsActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

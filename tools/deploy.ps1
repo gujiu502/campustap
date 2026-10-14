@@ -6,5 +6,5 @@ $apk = Join-Path $PSScriptRoot '..\Application\build\outputs\apk\debug\Applicati
 if (-not (Test-Path $apk)) { throw 'Run build.ps1 first.' }
 & adb -s $Serial install -r $apk
 if ($LASTEXITCODE -ne 0) { throw 'APK install failed; check the phone for an authorization prompt.' }
-& adb -s $Serial shell am start -W -n 'tw.campustap.diagnostics/com.example.android.cardemulation.MainActivity'
+& adb -s $Serial shell am start -W -n 'tw.campustap.diagnostics/com.example.android.cardemulation.CardsActivity'
 if ($LASTEXITCODE -ne 0) { throw 'Activity launch failed.' }
