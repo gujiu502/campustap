@@ -1,6 +1,9 @@
 # CampusTap — 多卡片 NFC 门禁参数管理
 
-2026-10-15，版本 `0.6.0-multi-card`。已在 Redmi 验证实际贴卡连续添加、点击切换、默认卡启动启用，以及后台锁屏后的配置保留。**控制器回读通过不代表真实门禁开门成功；实际 RF 与开门仍 NOT RUN。** 见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
+2026-10-15，版本 `0.6.1-permission-guide`。已在 Redmi 验证实际贴卡连续添加、点击切换、默认卡启动启用，以及后台锁屏后的配置保留。**用户已确认自己的 Redmi 可以使用；这是用户实测反馈。其他机型未适配，不能将授权成功当作全机型支持。** 见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
+
+
+[下载安装包 CampusTap 0.6.1](https://github.com/gujiu502/campustap/releases/download/v0.6.1/CampusTap-0.6.1.apk) · [发布说明与校验码](https://github.com/gujiu502/campustap/releases/tag/v0.6.1)
 
 ## 当前行为
 
@@ -9,6 +12,8 @@
 - 启动 App 自动启用默认卡；NFC 重新开启时尝试启用默认卡。主动暂停会关闭自动启用，直到再次点击卡片。
 - 正常启用后没有两分钟限时，不在离开 App 或熄屏时主动恢复；原配置的加密快照一直保留，供“暂停模拟”核对恢复。没有常驻前台服务或全局保持亮屏。
 - 普通流程没有“门禁测试”或工程参数界面。debug 可长按设置页版本文字进入内部开发页；只读后台探针仅打包到 debug，要求发送方有系统 DUMP 权限。
+- 设置新增“授权与兼容性”：显示本机 NFC、系统授权、机型／ROM 适配状态，提供一次性 ADB 授权步骤、复制指令与重新检查。启动时发现已适配设备缺少授权会主动显示引导。
+- 启用失败区分未授权、未适配、NFC 关闭和配置异常，不再将所有错误归为权限问题。
 - 使用记录展示最近一次设置、恢复和失败，不编造刷卡或开门成功记录。
 
 当前只实现已核验 Redmi 的 OEM NFC 识别参数设置，**没有 Classic 密钥认证、扇区复制或原实体悠游卡支付导入**。自订卡片仅保存外观。没有操作悠游付、改变付款钱包、Root、解锁或联系校方。
@@ -31,12 +36,12 @@ adb -s SERIAL shell pm grant tw.campustap.diagnostics android.permission.WRITE_S
 基于 [Google/AOSP CardEmulation](https://github.com/googlearchive/android-CardEmulation)，上游 SHA `167556ae24fd9ffe378715aa13bc197c9ca44361`，保留 Apache-2.0 与 Git 历史。Runtime 仅依赖 Android，未打包 OEM 二进制。JDK 17 / Gradle 8.13 / AGP 8.13.2 / compile、target 35 / min 31。
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build.ps1 -Distribution
 adb devices -l
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 -Serial SERIAL
 ```
 
-使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。17 项 JVM 测试与 lint 最终结果见交付 manifest。APK：`artifacts/builds/CampusTap-0.6.0-multi-card-debug.apk`，旁边有 SHA256 和构建记录；本地 debug 交付。
+发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 19 项 JVM 测试通过，lint 0 errors / 17 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
 
 | 文件 | 职责 |
 |---|---|

@@ -202,8 +202,10 @@ public final class NfcFlowActivity extends Activity implements NfcAdapter.Reader
     }
     private void showFailure(Exception error) {
         boolean pending = controller.recoveryRequired(); symbol.setText("");
+        VendorFailure failure = VendorFailure.at("ACTIVATE_CARD", error);
         status(pending ? "NFC 需要恢復" : "暫時無法啟用卡片", pending ? "請保持 NFC 開啟並重試恢復，完成前先不要使用 NFC 付款。"
-                : "請確認 NFC 已開啟且手機已完成授權，再重新嘗試。", pending ? "重試恢復" : "重試", pending ? () -> restore("正在恢復 NFC") : this::enable);
+                : failure.description(), pending ? "重試恢復" : failure.needsAuthorization() ? "查看授權方式" : "重試",
+                pending ? () -> restore("正在恢復 NFC") : failure.needsAuthorization() ? () -> NfcSetup.show(this, this::enable) : this::enable);
     }
     private void recordRestore(JSONObject report) throws Exception { if ("PASS".equals(report.optString("result"))) save("vendor_test_restore.json", report); }
     private void recordFailure(String operation, Exception error) {

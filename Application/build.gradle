@@ -7,12 +7,27 @@ android {
         applicationId 'tw.campustap.diagnostics'
         minSdk 31
         targetSdk 35
-        versionCode 8
-        versionName '0.6.0-multi-card'
+        versionCode 9
+        versionName '0.6.1-permission-guide'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+    signingConfigs {
+        distribution {
+            if (System.getenv('CAMPUSTAP_KEYSTORE')) {
+                storeFile file(System.getenv('CAMPUSTAP_KEYSTORE'))
+                storePassword System.getenv('CAMPUSTAP_STORE_PASSWORD')
+                keyAlias System.getenv('CAMPUSTAP_KEY_ALIAS')
+                keyPassword System.getenv('CAMPUSTAP_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (System.getenv('CAMPUSTAP_KEYSTORE')) signingConfig signingConfigs.distribution
+        }
     }
 }
 dependencies { testImplementation 'junit:junit:4.13.2' }

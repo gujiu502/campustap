@@ -1,3 +1,5 @@
+更新（0.6.1）：Debug／Release各19项通过（新增授权／不支持／NFC关闭区分、机型与ROM联合检查），lint均0 errors / 17 warnings。APK签名有效且与0.6.0相同；Release debuggable=false，无DeviceProbeReceiver，无长按调试入口。用户报告自己的Redmi已可用；新版授权引导UI实机及其他手机适配 NOT RUN。以下为0.6.0历史测试矩阵。
+
 # 验证矩阵
 
 2026-10-15，0.6.0-multi-card。详见 [实机报告](live-device-test.md) 和本地交付 manifest。

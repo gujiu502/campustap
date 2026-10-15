@@ -50,6 +50,8 @@ public final class CardsActivity extends Activity {
     private Dialog sheet;
     private boolean recoveryOpened;
     private boolean applyDefaultOnResume = true, activationBusy, visible;
+    private boolean authorizationShown;
+    private VendorFailure activationFailure;
     private String activationMessage = "";
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -76,6 +78,10 @@ public final class CardsActivity extends Activity {
         try { store = new CardStore(this); store.syncProfiles(this); }
         catch (Exception error) { message("卡片同步失敗；原資料已保留"); }
         if (draft != null) showEditor(); else showPage(page);
+        VendorFailure readiness = VendorCardController.readinessFailure(this);
+        if (!authorizationShown && readiness != null && readiness.needsAuthorization()) {
+            authorizationShown = true; showNfcSetup();
+        }
         if (applyDefaultOnResume) {
             applyDefaultOnResume = false;
             if (!store.defaultId.isEmpty() && getSharedPreferences("nfc-state", MODE_PRIVATE).getBoolean("autoActivate", true)) activateCard(store.defaultId);
@@ -170,6 +176,7 @@ public final class CardsActivity extends Activity {
         state.addView(label(!activationMessage.isEmpty() ? activationMessage : "點卡片即可啟用，右上角三點可編輯。NFC 付款前請暫停模擬；熄屏開門仍需實際驗證。", 13, MUTED, false));
         if (configured) state.addView(action("暫停模擬", false, () -> openFlow("restore", null)));
         else if (!store.defaultId.isEmpty()) state.addView(action("啟用預設卡片", true, () -> activateCard(store.defaultId)));
+        if (activationFailure != null) state.addView(action(activationFailure.needsAuthorization() ? "查看授權方式" : "查看相容性", false, this::showNfcSetup));
         body.addView(state);
     }
     private void showCardMenu(View anchor, CardAppearance card) {
@@ -191,7 +198,7 @@ public final class CardsActivity extends Activity {
         CardAppearance selected = null;
         for (CardAppearance card : store.cards) if (card.id.equals(id)) selected = card;
         if (selected == null || !selected.linked) { message("此卡片尚未錄入 NFC 資料"); return; }
-        activationBusy = true; activationMessage = "正在啟用「" + selected.name + "」…";
+        activationBusy = true; activationFailure = null; activationMessage = "正在啟用「" + selected.name + "」…";
         if (draft == null) showPage(page);
         VendorCardController.WORKER.execute(() -> {
             try {
@@ -200,8 +207,14 @@ public final class CardsActivity extends Activity {
                 getSharedPreferences("nfc-state", MODE_PRIVATE).edit().putBoolean("autoActivate", true).apply();
                 activationMessage = "已啟用所選卡片，離開軟體後保留。熄屏開門請以實際門禁結果為準。";
             } catch (Exception error) {
-                activationMessage = "暫時無法啟用，請確認 NFC 已開啟且手機已完成授權。";
                 try { new VendorCardController(this, id).restore(); } catch (Exception ignored) { }
+                activationFailure = VendorFailure.at("ACTIVATE_CARD", error);
+                activationMessage = activationFailure.description();
+                try (FileOutputStream output = openFileOutput("vendor_test_failure.json", MODE_PRIVATE)) {
+                    output.write(new JSONObject().put("observedAt", System.currentTimeMillis()).put("operation", "ACTIVATE_CARD")
+                            .put("result", "FAIL").put("stage", activationFailure.stage).put("reasonCode", activationFailure.code)
+                            .put("errorType", activationFailure.errorType()).put("uidLogged", false).toString(2).getBytes(StandardCharsets.UTF_8));
+                } catch (Exception ignored) { }
             }
             runOnUiThread(() -> { activationBusy = false; if (visible && draft == null) showPage(page); });
         });
@@ -383,6 +396,9 @@ public final class CardsActivity extends Activity {
         if (!found) { body.addView(label("尚無使用紀錄", 22, INK, true)); body.addView(label("卡片啟用與暫停結果會顯示於此。", 14, MUTED, false)); }
     }
     private void showSettings() {
+        LinearLayout permissions = panel(); permissions.addView(label("NFC 授權與相容性", 20, INK, true));
+        permissions.addView(label(NfcSetup.summary(this), 14, MUTED, false));
+        permissions.addView(action("查看授權方式", false, this::showNfcSetup)); body.addView(permissions, spaced(-1, -2, 0, 16));
         LinearLayout status = panel(); status.addView(label("NFC 與門禁", 20, INK, true));
         status.addView(label("是否能開門，請以現場門禁結果為準。目前不支援添加原實體悠遊卡的支付功能。", 14, MUTED, false));
         status.addView(action("暫停模擬並恢復 NFC", true, () -> openFlow("restore", null))); body.addView(status, spaced(-1, -2, 0, 16));
@@ -391,6 +407,12 @@ public final class CardsActivity extends Activity {
         TextView version = label("CampusTap · " + BuildConfig.VERSION_NAME, 13, MUTED, false);
         if (BuildConfig.DEBUG) version.setOnLongClickListener(v -> { startActivity(new Intent(this, MainActivity.class)); return true; });
         privacy.addView(version); body.addView(privacy);
+    }
+    private void showNfcSetup() {
+        NfcSetup.show(this, () -> {
+            if (!store.defaultId.isEmpty()) activateCard(store.defaultId);
+            else { showPage(page); VendorFailure failure = VendorCardController.readinessFailure(this); message(failure == null ? "NFC 授權與裝置檢查通過" : failure.description()); }
+        });
     }
     private void openFlow(String mode, String type) {
         if ("read".equals(mode)) applyDefaultOnResume = true;

@@ -151,12 +151,19 @@ final class VendorCardController {
         }
     }
     private void requirePermissionAndNfc() throws VendorFailure {
-        if (!"24115RA8EG".equals(Build.MODEL) || !"OS2.0.2.0.VOPMIXM".equals(Build.VERSION.INCREMENTAL))
-            throw new VendorFailure("CHECK_DEVICE", "UNVERIFIED_DEVICE", null);
-        if (context.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") != PackageManager.PERMISSION_GRANTED)
-            throw new VendorFailure("CHECK_PERMISSION", "PERMISSION_REQUIRED", null);
+        VendorFailure failure = readinessFailure(context);
+        if (failure != null) throw failure;
+    }
+    static VendorFailure readinessFailure(Context context) {
+        if (!RadioConfiguration.verifiedDevice(Build.MODEL, Build.VERSION.INCREMENTAL))
+            return new VendorFailure("CHECK_DEVICE", "UNVERIFIED_DEVICE", null);
+        if (!hasSystemPermission(context)) return new VendorFailure("CHECK_PERMISSION", "PERMISSION_REQUIRED", null);
         NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
-        if (nfc == null || !nfc.isEnabled()) throw new VendorFailure("CHECK_NFC", "NFC_OFF", null);
+        if (nfc == null) return new VendorFailure("CHECK_NFC", "NFC_UNAVAILABLE", null);
+        return nfc.isEnabled() ? null : new VendorFailure("CHECK_NFC", "NFC_OFF", null);
+    }
+    static boolean hasSystemPermission(Context context) {
+        return context.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == PackageManager.PERMISSION_GRANTED;
     }
     private Object adapter() throws Exception { return Class.forName("com.st.android.nfc_extensions.NfcAdapterStExtensions").getConstructor().newInstance(); }
     private byte[] controller(Object adapter) throws Exception {

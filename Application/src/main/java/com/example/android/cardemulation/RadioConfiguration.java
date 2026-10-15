@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.Map;
 
 final class RadioConfiguration {
+    static final String MODEL = "24115RA8EG", ROM = "OS2.0.2.0.VOPMIXM";
+    static boolean verifiedDevice(String model, String rom) { return MODEL.equals(model) && ROM.equals(rom); }
     static final int[] PARAMETERS = {0x30, 0x31, 0x32, 0x33, 0x58, 0x59};
     static void requireBaseline(byte[] controller, Map<Integer, byte[]> nci) throws VendorFailure {
         if (controller == null || controller.length < 82 || controller[20] != 0 || controller[26] != 32)
