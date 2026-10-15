@@ -1,10 +1,10 @@
 # 多品牌 NFC 接口核查
 
-2026-10-15，CampusTap 0.6.5。目标为本人实体卡的识别参数模拟，非 Root，不切换付款钱包。**本轮交付是扩大系统库发现及只读检测，不是所有品牌都能模拟。当前可写后端仍只有 ST；欧加后端未实现。** 所有新增加载路径及品牌实机均为 NOT RUN，当前 ADB 无连接设备。
+2026-10-15，CampusTap 0.7.0。目标为本人实体卡的识别参数模拟，非 Root，不切换付款钱包。**现有 ST 后端之外，新增实验性欧加直接设置／恢复后端；不要求无线调试、辅助 App 或先授予 ST 的 WSS 权限。** 新增路径及品牌实机均为 NOT RUN，当前没有目标手机验证，不能承诺一加／Realme 已能刷门禁。
 
 ## 判断标准
 
-手机品牌、系统钱包能开门、存在扩展类，均不足以证明普通 APK 能设置相同卡片。写入至少需要可调用的方法、实时授权、可读取的原配置、可验证恢复，以及已校准的控制器布局。本应用不按 Build.MODEL 或品牌名称放行。
+手机品牌、系统钱包能开门、存在扩展类，均不足以证明普通 APK 能设置相同卡片。本应用不按 Build.MODEL 或品牌名称放行。ST 保留已校准控制器布局与原始参数回读；欧加实验路径只接受可读取的停用状态并核对厂商状态，不具备完整控制器快照。两者的验证强度不同，不能混称。
 
 Android 公共 HCE 面向 ISO-DEP/APDU；没有设置任意固定 NFC-A UID 的公共接口。这里的“未找到”是本轮资料核查结果，不是对所有 ROM 私有实现的不存在证明。[Android HCE](https://developer.android.com/develop/connectivity/nfc/hce)
 
@@ -13,9 +13,9 @@ Android 公共 HCE 面向 ISO-DEP/APDU；没有设置任意固定 NFC-A UID 的�
 | 品牌／系列 | 找到的路径与本轮工作 | 当前可交付状态／阻塞 |
 |---|---|---|
 | Xiaomi／Redmi／POCO | ST 后端不再限型号；增加库来源发现与路由接口完整性检查 | 既有 Redmi 用户反馈可用；其他机器须通过方法、WSS、91字节布局与基线检查，不承诺全系列 |
-| OPPO | 新系统 vendor 客户端与旧 NfcAdapter 的类型签名检测、只读 UID 状态探针 | 找到接口也不能启用；缺少完整原配置及经验证的恢复流程 [欧加研究] |
-| Realme | 同时检查旧平台方法、新 vendor 库，不因品牌自动判为支持 | GT Neo 2 / RMX3370 的旧 ROM 未核验；不可套用 ColorOS 16 资料 [欧加研究] |
-| OnePlus | 检查三处已公开分析的 ROM 库路径；尝试解析有类型的静态工厂 | 源资料涉及 Android 16 的一套栈；第三方可调用性、区域限制与硬件仍待实测 [欧加研究] |
+| OPPO | 新增直接调用设置、厂商状态回读与停用恢复 | 实验性；须通过方法、功能开关、完整停用状态及回读检查；实机 NOT RUN [欧加研究] |
+| Realme | 旧平台方法与新 vendor 客户端均可进入同一直接调用流程 | GT Neo 2 / RMX3370 仍 NOT RUN；旧 ROM 方法或状态不足时拒绝写入 [欧加研究] |
+| OnePlus | 固定 ROM 库加载、有类型的静态工厂、直接设置／恢复 | 实验性；不先索取 ST 权限，服务端权限／区域／功能限制仍须遵守，实机 NOT RUN [欧加研究] |
 | Samsung | 识别 SamsungNfcAdapter；核对公开 Wallet NFC 接入与已分析的附件接口 | 附件通信不是固定 UID 后端；Wallet 要求接入配置，未接入 [三星] |
 | Huawei | 识别 HwNfcAdapter；核对 Wallet Kit 及旧 Android 扩展路由接口 | 路由选择不是任意 UID 设置；Wallet 为商户凭证接入，未接入 [华为] |
 | Honor | 核查原生钱包门禁支持；Android 机仍按实际接口检测 | 官方钱包能力不等于第三方接口，未取得可实现的 UID／恢复接口 [荣耀] |
@@ -38,18 +38,27 @@ Android 公共 HCE 面向 ISO-DEP/APDU；没有设置任意固定 NFC-A UID 的�
   - `/system_ext/framework/com.vendor.nfc.jar`
 - Manifest 将 `com.nxp.nfc` 声明为可选共享库；缺少库仍能安装。不把识别到 NXP 类视为能模拟。[NXP 构建配置](https://github.com/NXPNFCLinux/nxpnfc_android11/blob/master/device-nfc.mk)、[Android 共享库声明](https://developer.android.com/guide/topics/manifest/uses-library-element)
 - ST 只在参数写入／回读方法及路由快照方法完整时选择。启用和恢复使用同一个扩展类加载器，保留原有权限、加密快照及严格回读。没有放宽91字节布局。
-- 欧加识别 `setHceTypeAConfig(boolean, byte[], byte[], byte[]) → boolean` 与 `getHceTypeAUid() → String`，也检查工厂是否静态且有明确返回接口。探测不实例化、不初始化、不调用 setter。后台只读检查可连接服务、调用 getter；只输出有效长度，不保存或返回 UID 内容。
-- 后台报告区分 ST、Oplus、NXP、Samsung、Huawei 类存在与可写后端；不凭手机品牌生成“已适配”。详细报告仍在隐藏工程入口，正常 UI 不展示命令或接口清单。
+- 欧加检查 `setHceTypeAConfig(boolean, byte[], byte[], byte[]) → boolean`、`getHceTypeAUid() → String`、`hasFeature(String) → boolean`，也检查工厂是否静态且有明确返回接口。发现阶段不初始化厂商类、不调用 setter；点击卡片后才连接并执行预检与事务。
+- 后台报告区分 ST、Oplus、NXP、Samsung、Huawei 类存在与后端实现；欧加明确标注实验性和控制器回读不可用。详细报告仍在隐藏工程入口，正常 UI 不展示命令或接口清单。
 
 系统库来源限制遵循 [Android 动态加载安全说明](https://developer.android.com/privacy-and-security/risks/dynamic-code-loading)。这些约束限制应用可加载的路径，不替代 ROM 完整性验证。
 
-## 为什么本轮没有直接写欧加
+## 欧加直接路径与恢复范围
 
 [欧加研究]是研究者对 OnePlus ColorOS 16 / Android 16 / NFC 16.0.0.250924 的一手反编译分析，**不是厂商公开 API 合约，也不是本项目真机验证**。本轮检查版本 `dbf36c4faf2451d2e53f2b89cd73a5f21f736f9f`。只借鉴接口事实，不复制未授权代码或打包 OEM 二进制。
 
-该分析描述了四个持久化状态键，但未给出全部值的编码与恢复契约。UID getter 无法证明实际控制器 ATQA、SAK、随机 UID 模式及原监听配置可恢复。另有监听模式设置，但其具体语义仍含推断，也没有原值读取方法。因此本轮不把这些键当成完整恢复快照，不发送未经校准的模式值；界面明确显示“尚缺安全恢复适配”，不再误导为缺少 ST 授权。
+0.6.5 只识别接口。0.7.0 改为以下受限实验策略，恢复目标是“关闭本次静态 UID 覆盖并核对厂商元数据”，**不是原控制器每个字节的恢复证明**：
 
-后续写入适配的必要证据：相应 ROM 的实际方法返回、完整初始状态与恢复行为、失败和中断后的恢复，以及独立读头核验。Realme 旧 ROM 尤其不能以新 OnePlus 的接口权限结论代替。没有进行默认付款角色、地区标志、RUS、eSE 或系统配置文件改写。
+1. 只用有类型的方法调用，不猜 Binder 事务编号。启用前要求 `hasFeature("HCE_ACCESSCARD")` 返回 true；不改地区或 RUS 功能开关。
+2. 读取四个 `hce_access_card_` 状态键以及 UID getter。只接受明确的停用状态 `mode="0"`、ATQA 十六进制 `0000` 或 `0400`、SAK `00` 或 `20`，以及长度有效且与 getter 一致的 UID。编码不符、键缺失、已有活动卡或读取被拒绝，均不写。上述编码是保守实验约束，未宣称所有 ROM 都如此编码。
+3. 使用既有 AndroidKeyStore 加密、AtomicFile 持久化原元数据与目标卡，并解密核对。再次检查原状态；在调用 setter 前，另持久化“准备写入”标记。进程中断后仍能区分未尝试写入和可能已改动射频的情况。
+4. 仅调用厂商 `setHceTypeAConfig` 设置本次 UID、ATQA、SAK；必须返回 true，且 mode、三项卡参数与 UID getter 一致。只记录 `vendorStateReadback=PASS`，`controllerReadback=NOT_AVAILABLE`，实际门禁和熄屏仍 NOT_TESTED。
+5. 恢复按快照选择原后端，不因权限或默认后端变化而选错。对已尝试写入的欧加事务，即使元数据看似未变，也发送停用调用，因为 RF 可能先变而元数据后变。再次核对全部原元数据和 getter 后才删除恢复文件；失败保留文件。
+6. 若当前身份既不是原状态也不是本次卡片，拒绝覆盖其他操作选择的卡片。若同时出现 ST 和欧加恢复文件，停止写入，保留两者。
+
+这些状态键不是完整 RF／路由快照，读取成功不能证明实际控制器状态。源分析中的 native 停用分支使用厂商默认模板，而非任意原始控制器配置；本实验只从上述已停用基线进入。真实恢复行为、竞态、地区与旧 ROM 差异均尚待真机校准。没有调用监听模式切换、路由 setter、配置文件写入、地区／RUS 改写、eSE 重置或付款角色切换。
+
+状态读取使用 [Settings.Global.getString](https://developer.android.com/reference/android/provider/Settings.Global#getString(android.content.ContentResolver,%20java.lang.String))；应用不直接写入这些系统键。权限或编码不足时停止，不用默认值伪造快照。全新 ROM 尚未生成这些键时也可能被拒绝，不能把缺失键当成安全默认状态。
 
 ## 额外源码核对
 
@@ -61,7 +70,7 @@ NXP 旧扩展可提供路由、固件、配置写入方法；不具备已验证�
 
 ## 本轮验证
 
-Debug／Release 各29项 JVM 测试通过：新增欧加不初始化的签名检测、不完整接口拒绝、ST 路由条件、只读候选不能成为可写后端、失败原因不误导申请 ST 权限。lint 0 errors / 16 warnings。发布签名与0.6.4保持一致。新 ROM 库加载、欧加服务 getter、真实 RF、熄屏及支付恢复均 **NOT RUN**；没有连接手机，无法将这些检查标为通过。
+Debug／Release 各48项 JVM 测试：覆盖直接后端选择、快照先于写入、准备写入标记、进程中断恢复、调用被拒与部分生效、错误回读、存储／服务失败、外部卡片变更、恢复失败保留快照、编码拒绝。它们验证客户端协议，不证明厂商实际实现与假设相符。lint 0 errors / 16 warnings。发布签名延续旧版。新 ROM 库加载、厂商服务设置／恢复、真实 RF、熄屏及支付恢复均 **NOT RUN**。
 
 [欧加研究]: https://gist.github.com/PeronGH/8e272a007edfc192c0aff8d3a6b187da/dbf36c4faf2451d2e53f2b89cd73a5f21f736f9f
 [三星]: https://developer.samsung.com/wallet/addtosamsungwallet/nfccapabilities.html

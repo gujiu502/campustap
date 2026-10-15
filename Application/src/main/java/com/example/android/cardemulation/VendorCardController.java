@@ -23,9 +23,10 @@ final class VendorCardController {
         this.cardId = cardId; profileFile = CardAppearance.profileFile(cardId);
     }
     boolean hasProfile() { return state.exists(profileFile); }
-    boolean recoveryRequired() { return state.exists(ROLLBACK); }
+    boolean recoveryRequired() { return state.exists(ROLLBACK) || state.exists(OplusCardController.ROLLBACK); }
     static String activeCardId(Context context) {
-        if (!new PrivateState(context).exists(ROLLBACK)) return "";
+        PrivateState state = new PrivateState(context);
+        if (!state.exists(ROLLBACK) && !state.exists(OplusCardController.ROLLBACK)) return "";
         return context.getSharedPreferences("nfc-state", Context.MODE_PRIVATE).getString("activeCard", "");
     }
     void saveProfile(AccessCardProfile profile) throws Exception {
@@ -55,7 +56,11 @@ final class VendorCardController {
     }
     JSONObject verifyActive() throws Exception {
         synchronized (LOCK) {
+            requireSingleRecovery();
             requirePermissionAndNfc();
+            if (state.exists(OplusCardController.ROLLBACK))
+                return new OplusCardController(context).verify(loadProfile()).put("cardId", cardId);
+            requireStPermissionAndNfc();
             Object adapter = adapter();
             RadioConfiguration.requireEnabled(controller(adapter), readParameters(adapter), loadProfile());
             return new JSONObject().put("result", "PASS").put("cardId", cardId).put("uidLogged", false)
@@ -73,6 +78,7 @@ final class VendorCardController {
                 stage = "LOAD_ENCRYPTED_PROFILE";
                 if (!hasProfile()) throw new VendorFailure(stage, "PROFILE_REQUIRED", null);
                 AccessCardProfile profile = loadProfile();
+                if (useOplus(context)) return new OplusCardController(context).enable(profile);
                 stage = "CONNECT_VENDOR_SERVICE";
                 Object adapter = adapter();
                 stage = "SNAPSHOT_ORIGINAL_CONFIGURATION";
@@ -97,7 +103,7 @@ final class VendorCardController {
                         .put("controllerReadback", "PASS").put("uidMatched", true).put("uidByteLength", 4)
                         .put("uidLogged", false).put("sak", profile.sak & 255).put("classicAuthentication", "NOT_IMPLEMENTED")
                         .put("doorUnlockStatus", "NOT_TESTED").put("foregroundOnly", true).put("timeoutSeconds", 120);
-            } catch (Exception e) {
+            } catch (Exception | LinkageError e) {
                 VendorFailure failure = VendorFailure.at(stage, e);
                 if (rollbackSaved) try { restore(); } catch (Exception rollback) { failure.addSuppressed(rollback); }
                 throw failure;
@@ -107,9 +113,16 @@ final class VendorCardController {
     JSONObject restore() throws Exception {
         synchronized (LOCK) {
             if (!recoveryRequired()) return new JSONObject().put("operation", "RESTORE").put("result", "NO_ACTIVE_TEST");
+            requireSingleRecovery();
+            if (state.exists(OplusCardController.ROLLBACK)) {
+                requireBasicNfc(context);
+                JSONObject restored = new OplusCardController(context).restore();
+                context.getSharedPreferences("nfc-state", Context.MODE_PRIVATE).edit().remove("activeCard").apply();
+                return restored;
+            }
             String stage = "RESTORE_CHECK_PERMISSION";
             try {
-                requirePermissionAndNfc();
+                requireStPermissionAndNfc();
                 stage = "LOAD_ENCRYPTED_ROLLBACK";
                 JSONObject before = new JSONObject(new String(state.read(ROLLBACK), StandardCharsets.UTF_8));
                 byte[] original = decode(before.getString("controller"));
@@ -139,7 +152,7 @@ final class VendorCardController {
                     .put("result", "PASS").put("controllerBytesRestored", true).put("nciParametersRestored", true)
                     .put("routesRestored", true).put("uidRestoreCheck", RadioConfiguration.dynamicUid(saved.get(0x33))
                             ? "DYNAMIC_MODE_AND_FORMAT" : "EXACT_BYTES").put("doorUnlockStatus", "NOT_TESTED");
-            } catch (Exception e) { throw VendorFailure.at(stage, e); }
+            } catch (Exception | LinkageError e) { throw VendorFailure.at(stage, e); }
         }
     }
     void forgetProfile() throws Exception {
@@ -156,17 +169,30 @@ final class VendorCardController {
     static VendorFailure readinessFailure(Context context) {
         String unavailable = VendorLibraries.unavailableCode();
         if (!unavailable.isEmpty()) return new VendorFailure("CHECK_INTERFACE", unavailable, null);
-        VendorFailure authorization = NfcSetup.authorizationFailure(context);
-        if (authorization != null) return authorization;
-        NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
-        if (nfc == null) return new VendorFailure("CHECK_NFC", "NFC_UNAVAILABLE", null);
-        return nfc.isEnabled() ? null : new VendorFailure("CHECK_NFC", "NFC_OFF", null);
+        try { requireBasicNfc(context); } catch (VendorFailure error) { return error; }
+        return useOplus(context) ? null : NfcSetup.authorizationFailure(context);
     }
     static boolean hasSystemPermission(Context context) {
         return context.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == PackageManager.PERMISSION_GRANTED;
     }
-    static boolean hasVendorInterface() {
-        return VendorLibraries.stClass() != null;
+    static boolean useOplus(Context context) {
+        return VendorCapabilities.useOplus(VendorLibraries.stClass() != null, VendorLibraries.oplusApi() != null, hasSystemPermission(context));
+    }
+    private void requireSingleRecovery() throws VendorFailure {
+        if (state.exists(ROLLBACK) && state.exists(OplusCardController.ROLLBACK))
+            throw new VendorFailure("RESTORE", "RECOVERY_BACKEND_CONFLICT", null);
+    }
+    private static void requireBasicNfc(Context context) throws VendorFailure {
+        if (!NfcSetup.hasBasicAuthorization(context)) throw new VendorFailure("CHECK_PERMISSION", "NFC_PERMISSION_REQUIRED", null);
+        NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
+        if (nfc == null) throw new VendorFailure("CHECK_NFC", "NFC_UNAVAILABLE", null);
+        if (!nfc.isEnabled()) throw new VendorFailure("CHECK_NFC", "NFC_OFF", null);
+    }
+    private void requireStPermissionAndNfc() throws VendorFailure {
+        requireBasicNfc(context);
+        if (VendorLibraries.stClass() == null) throw new VendorFailure("CHECK_INTERFACE", "VENDOR_INTERFACE_UNAVAILABLE", null);
+        VendorFailure failure = NfcSetup.authorizationFailure(context);
+        if (failure != null) throw failure;
     }
     private Object adapter() throws Exception {
         Class<?> type = VendorLibraries.stClass();

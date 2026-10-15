@@ -230,7 +230,9 @@ public final class CardsActivity extends Activity {
                 JSONObject report = new VendorCardController(this, id).activate();
                 try (FileOutputStream output = openFileOutput("vendor_test_enable.json", MODE_PRIVATE)) { output.write(report.toString(2).getBytes(StandardCharsets.UTF_8)); }
                 getSharedPreferences("nfc-state", MODE_PRIVATE).edit().putBoolean("autoActivate", true).apply();
-                activationMessage = "已啟用所選卡片，離開軟體後保留。熄屏開門請以實際門禁結果為準。";
+                activationMessage = "OPLUS_DIRECT_EXPERIMENTAL".equals(report.optString("backend"))
+                        ? "卡片參數已設定（實驗性），請以實際門禁感應結果為準。"
+                        : "已啟用所選卡片，離開軟體後保留。熄屏開門請以實際門禁結果為準。";
             } catch (Exception error) {
                 try { new VendorCardController(this, id).restore(); } catch (Exception ignored) { }
                 activationFailure = VendorFailure.at("ACTIVATE_CARD", error);

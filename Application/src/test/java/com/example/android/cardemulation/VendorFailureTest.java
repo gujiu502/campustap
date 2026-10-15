@@ -48,10 +48,11 @@ public class VendorFailureTest {
         assertTrue(failure.description().contains("不能安全設定"));
     }
     @Test public void foundOplusApiDoesNotRequestAnIrrelevantStPermission() {
-        VendorFailure failure = new VendorFailure("CHECK_INTERFACE", "OPLUS_RESTORE_UNAVAILABLE", null);
+        VendorFailure failure = VendorFailure.at("OPLUS_ENABLE", new InvocationTargetException(new SecurityException("private detail")));
         assertFalse(failure.needsAuthorization());
-        assertTrue(failure.description().contains("恢復"));
+        assertTrue(failure.description().contains("系統拒絕"));
         assertFalse(failure.description().contains("授權"));
         assertFalse(failure.description().contains("adb"));
+        assertFalse(failure.description().contains("private detail"));
     }
 }

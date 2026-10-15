@@ -13,7 +13,8 @@ final class VendorCapabilities {
     static boolean oplusIdentityApi(Class<?> type) {
         return instanceMethod(type, "setHceTypeAConfig", boolean.class,
                 boolean.class, byte[].class, byte[].class, byte[].class)
-                && instanceMethod(type, "getHceTypeAUid", String.class);
+                && instanceMethod(type, "getHceTypeAUid", String.class)
+                && instanceMethod(type, "hasFeature", boolean.class, String.class);
     }
     static Class<?> oplusFactoryApi(Class<?> type) {
         if (type == null) return null;
@@ -39,6 +40,9 @@ final class VendorCapabilities {
         } catch (ReflectiveOperationException | SecurityException | LinkageError unavailable) { return false; }
     }
     static String unavailableCode(boolean st, boolean oplus) {
-        return st ? "" : oplus ? "OPLUS_RESTORE_UNAVAILABLE" : "VENDOR_INTERFACE_UNAVAILABLE";
+        return st || oplus ? "" : "VENDOR_INTERFACE_UNAVAILABLE";
+    }
+    static boolean useOplus(boolean st, boolean oplus, boolean stPermission) {
+        return oplus && (!st || !stPermission);
     }
 }

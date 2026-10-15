@@ -63,12 +63,13 @@ final class VendorLibraries {
         return VendorCapabilities.unavailableCode(st, !st && oplusApi() != null);
     }
     static JSONObject describe() throws org.json.JSONException {
-        return new JSONObject().put("selectedWritableBackend", stClass() == null ? "NONE" : "ST")
+        return new JSONObject().put("preferredBackendWithStPermission", stClass() != null ? "ST" : oplusApi() != null ? "OPLUS_DIRECT_EXPERIMENTAL" : "NONE")
                 .put("st", new JSONObject().put("classPresent", find(VendorInterface.CLASS_NAME) != null)
                         .put("requiredMethodsPresent", stClass() != null).put("runtimeBaselineCheckRequired", true))
                 .put("oplus", new JSONObject().put("classPresent", find(VendorCapabilities.OPLUS) != null)
-                        .put("identityMethodsPresent", oplusApi() != null).put("writableBackendImplemented", false)
-                        .put("reason", "ORIGINAL_CONFIGURATION_AND_RESTORE_NOT_VERIFIED"))
+                        .put("identityMethodsPresent", oplusApi() != null).put("writableBackendImplemented", true)
+                        .put("experimental", true).put("readableInactiveBaselineRequired", true)
+                        .put("controllerSnapshotAvailable", false).put("rfVerified", false))
                 .put("nxp", discovery(VendorCapabilities.NXP, "NO_VERIFIED_UID_SNAPSHOT_RESTORE"))
                 .put("samsung", discovery(VendorCapabilities.SAMSUNG, "ACCESSORY_API_IS_NOT_UID_EMULATION"))
                 .put("huawei", discovery(VendorCapabilities.HUAWEI, "ROUTING_API_IS_NOT_UID_EMULATION"))

@@ -1,3 +1,5 @@
+0.7.0 更新：新增实验性欧加直接设置／恢复，基本 NFC 权限即可进入其预检，不要求无线调试、辅助 App 或 ST 的 WSS。必须具备完整可读停用状态；加密备份与准备写入标记先于调用，厂商状态一致才记设置完成。恢复按文件选择后端，外部卡片变化不覆盖，失败保留资料。Debug／Release各48项通过，lint均0 errors / 16 warnings。新增18项事务测试与1项后端选择测试；不以客户端假服务测试推定实际厂商行为。库加载、厂商实际设置／恢复、真实 RF、熄屏、支付及原Redmi回归均 NOT RUN。详见 [直接路径与限制](vendor-compatibility.md)。以下保留历史证据。
+
 0.6.5 更新：扩展欧加三处固定 ROM 库加载，检查新 vendor 工厂与旧 NfcAdapter 身份方法。ST 后端须完整具备路由读取方法；写入及恢复均使用已选扩展的类加载器。Oplus／NXP／Samsung／Huawei 后台只读识别不代表可写支持；欧加缺恢复接口时不写入、不引导申请 ST 权限。Debug／Release各29项通过，lint均0 errors / 16 warnings。新增路径、欧加服务读取、其他品牌实际模拟、原Redmi回归均 NOT RUN。详见 [逐品牌核查](vendor-compatibility.md)。以下保留历史版本证据。
 
 0.6.4 更新：移除 App 与部署／采集脚本的型号、ROM白名单。改为检测实际ST扩展接口与所需方法，保留授权、加密快照、写入及恢复回读。当前只接受已校准91字节控制器布局与NCI基线。Debug／Release各24项通过、lint均0 errors / 16 warnings；编译后无型号条件、接口探测和签名隔离核验通过。当前无连接设备，Realme实际模拟 NOT RUN。以下保留历史版本证据。
