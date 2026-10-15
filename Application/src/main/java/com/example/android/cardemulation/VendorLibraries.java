@@ -62,8 +62,10 @@ final class VendorLibraries {
         boolean st = stClass() != null;
         return VendorCapabilities.unavailableCode(st, !st && oplusApi() != null);
     }
-    static JSONObject describe() throws org.json.JSONException {
-        return new JSONObject().put("preferredBackendWithStPermission", stClass() != null ? "ST" : oplusApi() != null ? "OPLUS_DIRECT_EXPERIMENTAL" : "NONE")
+    static JSONObject describe(Context context) throws org.json.JSONException {
+        return new JSONObject().put("selectedBackendCandidate", VendorCardController.useOplus(context) ? "OPLUS_DIRECT_EXPERIMENTAL"
+                        : stClass() != null ? "ST" : "NONE")
+                .put("activeChipVerified", false)
                 .put("st", new JSONObject().put("classPresent", find(VendorInterface.CLASS_NAME) != null)
                         .put("requiredMethodsPresent", stClass() != null).put("runtimeBaselineCheckRequired", true))
                 .put("oplus", new JSONObject().put("classPresent", find(VendorCapabilities.OPLUS) != null)

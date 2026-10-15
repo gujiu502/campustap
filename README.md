@@ -1,6 +1,6 @@
 # CampusTap — 多卡片 NFC 门禁参数管理
 
-2026-10-15，版本 `0.7.1-state-diagnostics`。一加用户反馈0.7.0状态检查失败；本版区分缺值、未知格式与 UID 状态不一致，兼容等价十六进制写法，设置页可复制不含卡号的兼容性信息。具体失败根因仍待目标手机信息确认，不能宣称该机模拟已修好。一加／OPPO／Realme 实验性直接路径无需无线调试或辅助 App，见 [兼容性说明](docs/vendor-compatibility.md)。原 Redmi 可用为用户反馈；既有证据见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
+2026-10-15，版本 `0.7.2-inactive-initial-state`。一加 CPH2653 用户报告接口／功能检测通过，但身份记录全空。新增仅限“MODE明确为0且四项记录全空”的初始停用状态分支，不再要求不存在的旧卡号；MODE不明、活动状态或部分记录缺失仍停止。**目标手机实际设置、恢复与开门尚未验证。** 实验性欧加路径无需无线调试或辅助App，见 [兼容性说明](docs/vendor-compatibility.md)。原 Redmi 可用为用户反馈；既有证据见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
 
 
 [下载最新版安装包](https://github.com/gujiu502/campustap/releases/latest/download/CampusTap.apk) · [发布说明与校验码](https://github.com/gujiu502/campustap/releases/latest)
@@ -14,7 +14,7 @@
 - 普通流程没有“门禁测试”或工程参数界面。debug 可长按设置页版本文字进入内部开发页；只读后台探针仅打包到 debug，要求发送方有系统 DUMP 权限。
 - 普通界面移除长授权说明、电脑命令和“前往授权”按钮。启动只检查基本 NFC，已授权即可进入列表、编辑和读卡；系统特权仅在实际卡片模拟时严格检查，不再锁住整个软件。
 - 启用失败区分未授权、缺少厂商接口、NFC关闭与配置异常。接口检测不依赖型号／ROM；所需方法缺失或原配置不匹配时拒绝写入。
-- 只加载 ROM 已有的固定位置 NFC 库。欧加须通过功能检测、完整停用状态读取与加密备份后才直接设置；返回 true 且厂商状态匹配才记录设置完成，不把它当成实际控制器或开门证明。NXP、Samsung、Huawei 仍只有检测。
+- 只加载 ROM 已有的固定位置 NFC 库。欧加须通过功能检测、受限停用状态检查与加密备份后才直接设置；返回 true 且完整活动状态匹配才记录设置完成，不把它当成实际控制器或开门证明。NXP、Samsung、Huawei 仍只有检测。
 - 使用记录展示最近一次设置、恢复和失败，不编造刷卡或开门成功记录。
 - 设置页“複製相容性資訊”只在用户点击后读取型号、版本、接口及各状态字段检查结果，复制到本机剪贴板；不含卡号／UID 原值，不自动上传，无需调试连接。按钮使用现有样式，不增加工程页面或长说明弹窗。
 
@@ -31,7 +31,7 @@
 adb -s SERIAL shell pm grant tw.campustap.diagnostics android.permission.WRITE_SECURE_SETTINGS
 ```
 
-ST 保留91字节布局、动态 UID／ATS、加密快照及控制器／NCI／路由核对。欧加保存可读取的停用元数据与准备写入标记，直接调用系统 setter，再核对状态；暂停时停用本次覆盖并核对原元数据，不声称拥有完整 RF 快照。两种后端均在恢复失败时保留资料，不把 null 当默认值。状态变成其他卡片时拒绝覆盖。
+ST 保留91字节布局、动态 UID／ATS、加密快照及控制器／NCI／路由核对。欧加保存受限停用元数据或明确的“初始无身份”状态及准备写入标记，再调用 setter 并核对。完整原记录按原元数据恢复；初始全空状态通过厂商停用接口恢复到空状态或已知停用标记，可能生成新元数据，不能恢复最初空键或证明完整RF恢复。两种后端均在恢复失败时保留资料；状态变成其他卡片时拒绝覆盖。
 
 ## 构建与安装
 
@@ -43,7 +43,7 @@ adb devices -l
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 -Serial SERIAL
 ```
 
-发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 54 项 JVM 测试通过，lint 0 errors / 16 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
+发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 62 项 JVM 测试通过，lint 0 errors / 16 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
 
 | 文件 | 职责 |
 |---|---|

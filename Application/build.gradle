@@ -7,8 +7,8 @@ android {
         applicationId 'tw.campustap.diagnostics'
         minSdk 31
         targetSdk 35
-        versionCode 15
-        versionName '0.7.1-state-diagnostics'
+        versionCode 16
+        versionName '0.7.2-inactive-initial-state'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

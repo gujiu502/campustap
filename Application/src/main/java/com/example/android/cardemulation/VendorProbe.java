@@ -15,7 +15,7 @@ public final class VendorProbe {
                         == PackageManager.PERMISSION_GRANTED ? "GRANTED" : "DENIED")
                 .put("mutationAttempted", false).put("rfParametersChanged", false)
                 .put("doorUnlockStatus", "NOT_TESTED")
-                .put("vendorCapabilities", VendorLibraries.describe())
+                .put("vendorCapabilities", VendorLibraries.describe(context))
                 .put("oplusReadOnly", VendorLibraries.readOplusUidStatus(context));
         JSONArray operations = new JSONArray();
         report.put("operationsAttempted", operations);

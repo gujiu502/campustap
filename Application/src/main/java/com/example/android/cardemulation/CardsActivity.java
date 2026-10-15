@@ -445,7 +445,7 @@ public final class CardsActivity extends Activity {
                 JSONObject report = new JSONObject().put("appVersion", BuildConfig.VERSION_NAME)
                         .put("manufacturer", android.os.Build.MANUFACTURER).put("model", android.os.Build.MODEL)
                         .put("android", android.os.Build.VERSION.RELEASE).put("sdk", android.os.Build.VERSION.SDK_INT)
-                        .put("systemBuild", android.os.Build.DISPLAY).put("capabilities", VendorLibraries.describe())
+                        .put("systemBuild", android.os.Build.DISPLAY).put("capabilities", VendorLibraries.describe(this))
                         .put("oplus", new OplusCardController(this).compatibility()).put("uidLogged", false);
                 String text = report.toString(2);
                 runOnUiThread(() -> {

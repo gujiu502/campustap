@@ -17,13 +17,20 @@ final class OplusTransaction {
         final String mode, atqa, sak, uid, reportedUid;
         State(String mode, String atqa, String sak, String uid, String reportedUid) throws VendorFailure {
             this.mode = OplusStateFormat.parse(OplusStateFormat.Field.MODE, mode);
+            if ("0".equals(this.mode) && absent(atqa) && absent(sak) && absent(uid) && absent(reportedUid)) {
+                this.atqa = this.sak = this.uid = this.reportedUid = "";
+                return;
+            }
             this.atqa = OplusStateFormat.parse(OplusStateFormat.Field.ATQA, atqa);
             this.sak = OplusStateFormat.parse(OplusStateFormat.Field.SAK, sak);
             this.uid = OplusStateFormat.parse(OplusStateFormat.Field.UID, uid);
-            this.reportedUid = OplusStateFormat.parse(OplusStateFormat.Field.REPORTED_UID, reportedUid);
-            if (!this.uid.equals(this.reportedUid)) throw failure("OPLUS_UID_STATE_MISMATCH");
+            this.reportedUid = "0".equals(this.mode) && absent(reportedUid) ? ""
+                    : OplusStateFormat.parse(OplusStateFormat.Field.REPORTED_UID, reportedUid);
+            if (!this.reportedUid.isEmpty() && !this.uid.equals(this.reportedUid)) throw failure("OPLUS_UID_STATE_MISMATCH");
         }
+        boolean uninitializedInactive() { return "0".equals(mode) && atqa.isEmpty() && sak.isEmpty() && uid.isEmpty() && reportedUid.isEmpty(); }
         void requireBaseline() throws VendorFailure {
+            if (uninitializedInactive()) return;
             // shortcut: only inactive, explicitly readable default/sentinel states; expand after ROM calibration.
             if (!"0".equals(mode) || !("0000".equals(atqa) || "0400".equals(atqa))
                     || !("00".equals(sak) || "20".equals(sak))) throw failure("OPLUS_BASELINE_MISMATCH");
@@ -33,8 +40,14 @@ final class OplusTransaction {
                     && uid.equals(other.uid) && reportedUid.equals(other.reportedUid);
         }
         boolean identity(AccessCardProfile profile) {
-            return Arrays.equals(bytes(atqa), profile.atqa) && Arrays.equals(bytes(sak), new byte[]{profile.sak})
+            return !uid.isEmpty() && Arrays.equals(bytes(atqa), profile.atqa) && Arrays.equals(bytes(sak), new byte[]{profile.sak})
                     && Arrays.equals(bytes(uid), profile.uid);
+        }
+        boolean restoredFrom(State original) {
+            if (!original.uninitializedInactive()) return original.same(this);
+            // No original identity existed: verify stopped override, not recreation of absent Settings keys.
+            return uninitializedInactive() || ("0".equals(mode) && ("0000".equals(atqa) || "0400".equals(atqa))
+                    && ("00".equals(sak) || "20".equals(sak)) && "00000011".equals(uid));
         }
     }
     static final class Snapshot {
@@ -55,7 +68,7 @@ final class OplusTransaction {
     private final Recovery recovery;
     OplusTransaction(Port port, Recovery recovery) { this.port = port; this.recovery = recovery; }
 
-    void enable(AccessCardProfile profile) throws Exception {
+    boolean enable(AccessCardProfile profile) throws Exception {
         if (recovery.load() != null) restore();
         Snapshot snapshot = new Snapshot(port.read(), profile);
         recovery.save(snapshot); // The store must encrypt, flush and verify before returning.
@@ -65,6 +78,7 @@ final class OplusTransaction {
             if (!port.set(true, profile.atqa.clone(), new byte[]{profile.sak}, profile.uid.clone()))
                 throw failure("OPLUS_SET_REJECTED");
             verify(profile);
+            return snapshot.before.uninitializedInactive();
         } catch (Exception | LinkageError error) {
             try { restore(); } catch (Exception | LinkageError rollback) { error.addSuppressed(rollback); }
             throw error;
@@ -81,10 +95,13 @@ final class OplusTransaction {
         if (!saved.attempted) { recovery.clear(); return; }
         State current = port.read();
         // A setter may change RF before updating its metadata: even unchanged metadata needs disarming.
-        if (!saved.before.same(current) && !current.identity(saved.requested)) throw failure("OPLUS_STATE_CHANGED");
-        if (!port.set(false, bytes(saved.before.atqa), bytes(saved.before.sak), bytes(saved.before.uid)))
+        if (!current.restoredFrom(saved.before) && !current.identity(saved.requested)) throw failure("OPLUS_STATE_CHANGED");
+        // The published OEM disarm call takes these sentinel arguments; they are not a fabricated snapshot.
+        boolean empty = saved.before.uninitializedInactive();
+        if (!port.set(false, empty ? new byte[2] : bytes(saved.before.atqa), empty ? new byte[1] : bytes(saved.before.sak),
+                empty ? new byte[]{0, 0, 0, 0x11} : bytes(saved.before.uid)))
             throw failure("OPLUS_RESTORE_REJECTED");
-        if (!saved.before.same(port.read())) throw failure("RESTORE_READBACK_MISMATCH");
+        if (!port.read().restoredFrom(saved.before)) throw failure("RESTORE_READBACK_MISMATCH");
         recovery.clear();
     }
     static String hex(byte[] value) {
@@ -100,4 +117,5 @@ final class OplusTransaction {
         return result;
     }
     private static VendorFailure failure(String code) { return new VendorFailure("OPLUS_TRANSACTION", code, null); }
+    private static boolean absent(String value) { return value == null || (value.length() <= 128 && value.trim().isEmpty()); }
 }

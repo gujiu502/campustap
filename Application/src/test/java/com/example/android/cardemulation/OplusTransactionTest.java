@@ -10,7 +10,7 @@ public class OplusTransactionTest {
     }
     private static final class Store implements OplusTransaction.Recovery {
         OplusTransaction.Snapshot saved;
-        boolean failSave;
+        boolean failSave, failClear;
         Runnable afterSave;
         @Override public OplusTransaction.Snapshot load() { return saved; }
         @Override public void save(OplusTransaction.Snapshot value) throws Exception {
@@ -18,13 +18,16 @@ public class OplusTransactionTest {
             saved = value;
             if (afterSave != null && !value.attempted) afterSave.run();
         }
-        @Override public void clear() { saved = null; }
+        @Override public void clear() throws Exception {
+            if (failClear) throw new java.io.IOException("Recovery cleanup unavailable");
+            saved = null;
+        }
     }
     private static final class Port implements OplusTransaction.Port {
         final Store store;
         OplusTransaction.State current = state("0", "0000", "00", "00000011");
         boolean rejectEnable, rejectRestore, ignoreEnable, mismatchEnable, failReads;
-        boolean partialEnable, failReadsAfterEnable, mismatchRestore, linkageAfterEnable;
+        boolean partialEnable, failReadsAfterEnable, mismatchRestore, linkageAfterEnable, unrelatedRestoreUid;
         int enables, restores;
         Port(Store store) throws Exception { this.store = store; }
         @Override public OplusTransaction.State read() throws Exception {
@@ -46,6 +49,7 @@ public class OplusTransactionTest {
             if (rejectRestore) return false;
             current = state("0", OplusTransaction.hex(atqa), OplusTransaction.hex(sak), OplusTransaction.hex(uid));
             if (mismatchRestore) current = state("0", "0400", "20", OplusTransaction.hex(uid));
+            if (unrelatedRestoreUid) current = state("0", "0000", "00", "11121314");
             return true;
         }
     }
@@ -159,5 +163,61 @@ public class OplusTransactionTest {
         assertEquals("0008ff", OplusTransaction.hex(new byte[]{0, 8, (byte) 255}));
         assertThrows(IllegalArgumentException.class, () -> OplusTransaction.bytes("01020304F"));
         assertThrows(IllegalArgumentException.class, () -> OplusTransaction.bytes("gg"));
+    }
+    @Test public void acceptsOnlyExplicitlyInactiveCompletelyEmptyInitialState() throws Exception {
+        OplusTransaction.State empty = new OplusTransaction.State("0", null, null, null, null);
+        empty.requireBaseline(); assertTrue(empty.uninitializedInactive());
+        assertEquals("", empty.uid); assertEquals("", empty.atqa);
+        assertThrows(VendorFailure.class, () -> new OplusTransaction.State("1", null, null, null, null));
+        assertThrows(VendorFailure.class, () -> new OplusTransaction.State(null, null, null, null, null));
+    }
+    @Test public void emptyInitialStateIsNotUsedToFillPartialOrMalformedRecords() {
+        assertThrows(VendorFailure.class, () -> new OplusTransaction.State("0", null, "00", null, null));
+        assertThrows(VendorFailure.class, () -> new OplusTransaction.State("0", "garbage", null, null, null));
+        assertThrows(VendorFailure.class, () -> new OplusTransaction.State("0", " ".repeat(129), null, null, null));
+    }
+    @Test public void initialActivationKeepsAbsentIdentityInSnapshotAndUsesVendorDisarm() throws Exception {
+        Store store = new Store(); Port port = new Port(store);
+        port.current = new OplusTransaction.State("0", null, null, null, null);
+        assertTrue(new OplusTransaction(port, store).enable(CARD));
+        assertTrue(store.saved.before.uninitializedInactive()); assertEquals("", store.saved.before.uid);
+        new OplusTransaction(port, store).restore();
+        assertEquals("0", port.current.mode); assertEquals("00000011", port.current.uid);
+        assertNull(store.saved); assertEquals(1, port.restores);
+    }
+    @Test public void failedInitialActivationStillDisarmsWithoutInventingPreviousUid() throws Exception {
+        Store store = new Store(); Port port = new Port(store);
+        port.current = new OplusTransaction.State("0", null, null, null, null); port.rejectEnable = true;
+        assertThrows(VendorFailure.class, () -> new OplusTransaction(port, store).enable(CARD));
+        assertEquals(1, port.restores); assertEquals("0", port.current.mode); assertNull(store.saved);
+    }
+    @Test public void initialRecoveryNeverReplacesAnotherSelectedCard() throws Exception {
+        Store store = new Store(); Port port = new Port(store);
+        port.current = new OplusTransaction.State("0", null, null, null, null);
+        new OplusTransaction(port, store).enable(CARD);
+        port.current = state("1", "0400", "08", "11121314");
+        VendorFailure failure = assertThrows(VendorFailure.class, () -> new OplusTransaction(port, store).restore());
+        assertEquals("OPLUS_STATE_CHANGED", failure.code); assertEquals(0, port.restores); assertNotNull(store.saved);
+    }
+    @Test public void initialRecoveryRequiresStoppedOverrideAndExpectedSentinel() throws Exception {
+        Store store = new Store(); Port port = new Port(store);
+        port.current = new OplusTransaction.State("0", null, null, null, null);
+        new OplusTransaction(port, store).enable(CARD); port.unrelatedRestoreUid = true;
+        VendorFailure failure = assertThrows(VendorFailure.class, () -> new OplusTransaction(port, store).restore());
+        assertEquals("RESTORE_READBACK_MISMATCH", failure.code); assertNotNull(store.saved);
+    }
+    @Test public void initialRecoveryCanRetryAfterDisarmSucceededButJournalRemovalFailed() throws Exception {
+        Store store = new Store(); Port port = new Port(store);
+        port.current = new OplusTransaction.State("0", null, null, null, null);
+        new OplusTransaction(port, store).enable(CARD); store.failClear = true;
+        assertThrows(java.io.IOException.class, () -> new OplusTransaction(port, store).restore()); assertNotNull(store.saved);
+        store.failClear = false; new OplusTransaction(port, store).restore(); assertNull(store.saved);
+    }
+    @Test public void emptyUidGetterIsAllowedOnlyInInactiveStateAndNeverCountsAsActiveReadback() throws Exception {
+        OplusTransaction.State stopped = new OplusTransaction.State("0", "0000", "00", "00000011", null);
+        stopped.requireBaseline(); assertFalse(stopped.uninitializedInactive());
+        OplusTransaction.State original = new OplusTransaction.State("0", null, null, null, null);
+        assertTrue(stopped.restoredFrom(original));
+        assertThrows(VendorFailure.class, () -> new OplusTransaction.State("1", "0400", "08", "01020304", null));
     }
 }

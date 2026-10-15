@@ -26,7 +26,7 @@ final class OplusCardController {
             try { report.put("featureEnabled", connection.api.getMethod("hasFeature", String.class).invoke(connection.adapter, "HCE_ACCESSCARD")); }
             catch (Exception | LinkageError error) { report.put("featureReadError", VendorFailure.at("OPLUS_FEATURE", error).errorType()); }
             JSONObject fields = new JSONObject();
-            String storedUid = null, reportedUid = null;
+            java.util.EnumMap<OplusStateFormat.Field, String> rawFields = new java.util.EnumMap<>(OplusStateFormat.Field.class);
             for (OplusStateFormat.Field field : OplusStateFormat.Field.values()) {
                 JSONObject item = new JSONObject();
                 try {
@@ -36,10 +36,20 @@ final class OplusCardController {
                         raw = value instanceof String ? (String) value : null;
                     } else raw = connection.setting(field.name().toLowerCase(java.util.Locale.ROOT));
                     item.put("status", OplusStateFormat.status(field, raw)).put("characters", raw == null ? 0 : Math.min(raw.length(), 129));
-                    if (field == OplusStateFormat.Field.UID) storedUid = raw;
-                    if (field == OplusStateFormat.Field.REPORTED_UID) reportedUid = raw;
+                    rawFields.put(field, raw);
                 } catch (Exception | LinkageError error) { item.put("status", "READ_FAILED").put("errorType", VendorFailure.at("OPLUS_READ", error).errorType()); }
                 fields.put(field.name(), item);
+            }
+            String storedUid = rawFields.get(OplusStateFormat.Field.UID), reportedUid = rawFields.get(OplusStateFormat.Field.REPORTED_UID);
+            String mode = rawFields.get(OplusStateFormat.Field.MODE);
+            if ("VALID".equals(OplusStateFormat.status(OplusStateFormat.Field.MODE, mode)))
+                report.put("mode", OplusStateFormat.parse(OplusStateFormat.Field.MODE, mode));
+            if (rawFields.size() == OplusStateFormat.Field.values().length) {
+                try {
+                    OplusTransaction.State current = new OplusTransaction.State(mode, rawFields.get(OplusStateFormat.Field.ATQA),
+                            rawFields.get(OplusStateFormat.Field.SAK), storedUid, reportedUid);
+                    report.put("uninitializedInactive", current.uninitializedInactive());
+                } catch (VendorFailure error) { report.put("stateValidation", error.code); }
             }
             if ("VALID".equals(OplusStateFormat.status(OplusStateFormat.Field.UID, storedUid))
                     && "VALID".equals(OplusStateFormat.status(OplusStateFormat.Field.REPORTED_UID, reportedUid)))
@@ -56,8 +66,8 @@ final class OplusCardController {
             Connection connection = new Connection();
             if (!Boolean.TRUE.equals(connection.api.getMethod("hasFeature", String.class).invoke(connection.adapter, "HCE_ACCESSCARD")))
                 throw new VendorFailure("OPLUS_FEATURE", "OPLUS_FEATURE_UNAVAILABLE", null);
-            transaction(connection).enable(profile);
-            return report("ENABLE_TEST").put("uidByteLength", profile.uid.length).put("uidMatched", true)
+            boolean fromEmpty = transaction(connection).enable(profile);
+            return report("ENABLE_TEST").put("startedWithoutVendorIdentity", fromEmpty).put("uidByteLength", profile.uid.length).put("uidMatched", true)
                     .put("classicAuthentication", "NOT_IMPLEMENTED");
         } catch (Exception | LinkageError error) { throw VendorFailure.at("OPLUS_ENABLE", error); }
     }
@@ -68,7 +78,7 @@ final class OplusCardController {
     JSONObject restore() throws Exception {
         try {
             transaction(new Connection()).restore();
-            return report("RESTORE").put("restoreScope", "VENDOR_STATE_AND_DISABLED_OVERRIDE")
+            return report("RESTORE").put("restoreScope", "DISABLED_OVERRIDE_AND_CHECKED_VENDOR_STATE")
                     .put("controllerBytesRestored", false).put("routesWritten", false);
         } catch (Exception | LinkageError error) { throw VendorFailure.at("OPLUS_RESTORE", error); }
     }
