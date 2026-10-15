@@ -14,6 +14,43 @@ final class OplusCardController {
     private final PrivateState state;
     OplusCardController(Context context) { this.context = context; state = new PrivateState(context); }
 
+    JSONObject compatibility() throws Exception {
+        JSONObject report = new JSONObject().put("mutationAttempted", false).put("uidLogged", false)
+                .put("recoveryPending", state.exists(ROLLBACK));
+        NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
+        if (nfc == null || !nfc.isEnabled()) return report.put("status", nfc == null ? "NFC_UNAVAILABLE" : "NFC_OFF");
+        if (VendorLibraries.oplusApi() == null) return report.put("status", "API_UNAVAILABLE");
+        try {
+            Connection connection = new Connection();
+            report.put("api", connection.api == NfcAdapter.class ? "PLATFORM" : "VENDOR_LIBRARY");
+            try { report.put("featureEnabled", connection.api.getMethod("hasFeature", String.class).invoke(connection.adapter, "HCE_ACCESSCARD")); }
+            catch (Exception | LinkageError error) { report.put("featureReadError", VendorFailure.at("OPLUS_FEATURE", error).errorType()); }
+            JSONObject fields = new JSONObject();
+            String storedUid = null, reportedUid = null;
+            for (OplusStateFormat.Field field : OplusStateFormat.Field.values()) {
+                JSONObject item = new JSONObject();
+                try {
+                    String raw;
+                    if (field == OplusStateFormat.Field.REPORTED_UID) {
+                        Object value = connection.api.getMethod("getHceTypeAUid").invoke(connection.adapter);
+                        raw = value instanceof String ? (String) value : null;
+                    } else raw = connection.setting(field.name().toLowerCase(java.util.Locale.ROOT));
+                    item.put("status", OplusStateFormat.status(field, raw)).put("characters", raw == null ? 0 : Math.min(raw.length(), 129));
+                    if (field == OplusStateFormat.Field.UID) storedUid = raw;
+                    if (field == OplusStateFormat.Field.REPORTED_UID) reportedUid = raw;
+                } catch (Exception | LinkageError error) { item.put("status", "READ_FAILED").put("errorType", VendorFailure.at("OPLUS_READ", error).errorType()); }
+                fields.put(field.name(), item);
+            }
+            if ("VALID".equals(OplusStateFormat.status(OplusStateFormat.Field.UID, storedUid))
+                    && "VALID".equals(OplusStateFormat.status(OplusStateFormat.Field.REPORTED_UID, reportedUid)))
+                report.put("uidStatesMatch", OplusStateFormat.parse(OplusStateFormat.Field.UID, storedUid)
+                        .equals(OplusStateFormat.parse(OplusStateFormat.Field.REPORTED_UID, reportedUid)));
+            return report.put("status", "READ_ONLY_CHECK_COMPLETE").put("fields", fields);
+        } catch (Exception | LinkageError error) {
+            return report.put("status", "CONNECT_FAILED").put("errorType", VendorFailure.at("OPLUS_CONNECT", error).errorType());
+        }
+    }
+
     JSONObject enable(AccessCardProfile profile) throws Exception {
         try {
             Connection connection = new Connection();

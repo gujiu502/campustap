@@ -426,7 +426,9 @@ public final class CardsActivity extends Activity {
     private void showSettings() {
         LinearLayout permissions = panel(); permissions.addView(label("NFC 狀態", 20, INK, true));
         permissions.addView(label(NfcSetup.summary(this), 14, MUTED, false));
-        permissions.addView(action("NFC 設定", false, () -> NfcSetup.openSettings(this))); body.addView(permissions, spaced(-1, -2, 0, 16));
+        permissions.addView(action("NFC 設定", false, () -> NfcSetup.openSettings(this)));
+        permissions.addView(action("複製相容性資訊", false, this::copyCompatibility));
+        body.addView(permissions, spaced(-1, -2, 0, 16));
         LinearLayout status = panel(); status.addView(label("NFC 與門禁", 20, INK, true));
         status.addView(label("是否能開門，請以現場門禁結果為準。目前不支援添加原實體悠遊卡的支付功能。", 14, MUTED, false));
         status.addView(action("暫停模擬並恢復 NFC", true, () -> openFlow("restore", null))); body.addView(status, spaced(-1, -2, 0, 16));
@@ -435,6 +437,31 @@ public final class CardsActivity extends Activity {
         TextView version = label("CampusTap · " + BuildConfig.VERSION_NAME, 13, MUTED, false);
         if (BuildConfig.DEBUG) version.setOnLongClickListener(v -> { startActivity(new Intent(this, MainActivity.class)); return true; });
         privacy.addView(version); body.addView(privacy);
+    }
+    private void copyCompatibility() {
+        message("正在讀取相容性資訊…");
+        VendorCardController.WORKER.execute(() -> {
+            try {
+                JSONObject report = new JSONObject().put("appVersion", BuildConfig.VERSION_NAME)
+                        .put("manufacturer", android.os.Build.MANUFACTURER).put("model", android.os.Build.MODEL)
+                        .put("android", android.os.Build.VERSION.RELEASE).put("sdk", android.os.Build.VERSION.SDK_INT)
+                        .put("systemBuild", android.os.Build.DISPLAY).put("capabilities", VendorLibraries.describe())
+                        .put("oplus", new OplusCardController(this).compatibility()).put("uidLogged", false);
+                String text = report.toString(2);
+                runOnUiThread(() -> {
+                    if (!visible || isFinishing()) return;
+                    try {
+                        android.content.ClipData clip = android.content.ClipData.newPlainText("CampusTap 相容性資訊", text);
+                        if (android.os.Build.VERSION.SDK_INT >= 33) {
+                            android.os.PersistableBundle extras = new android.os.PersistableBundle();
+                            extras.putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true); clip.getDescription().setExtras(extras);
+                        }
+                        getSystemService(android.content.ClipboardManager.class).setPrimaryClip(clip);
+                        if (android.os.Build.VERSION.SDK_INT < 33) message("相容性資訊已複製，不含卡號");
+                    } catch (RuntimeException error) { message("複製未完成，請保持軟體在前景後重試"); }
+                });
+            } catch (Exception | LinkageError error) { runOnUiThread(() -> { if (visible) message("相容性資訊讀取未完成，請重試"); }); }
+        });
     }
     private void openFlow(String mode, String type) {
         if (!NfcSetup.hasBasicAuthorization(this)) { showAuthorizationGate(); return; }

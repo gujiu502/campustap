@@ -72,7 +72,8 @@ public class OplusTransactionTest {
     }
     @Test public void rejectsMissingMalformedAndInconsistentStateWithoutLeakingValues() {
         VendorFailure missing = assertThrows(VendorFailure.class, () -> new OplusTransaction.State("0", null, "00", "00000011", "00000011"));
-        assertEquals("OPLUS_STATE_UNREADABLE", missing.code);
+        assertEquals("OPLUS_STATE_MISSING", missing.code);
+        assertEquals("OPLUS_READ_ATQA", missing.stage);
         assertThrows(VendorFailure.class, () -> state("false", "0000", "00", "00000011"));
         assertThrows(VendorFailure.class, () -> state("0", "0000", "00", "not a card"));
         assertThrows(VendorFailure.class, () -> new OplusTransaction.State("0", "0000", "00", "00000011", "11121314"));

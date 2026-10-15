@@ -1,7 +1,6 @@
 package com.example.android.cardemulation;
 
 import java.util.Arrays;
-import java.util.Locale;
 
 /** Experimental vendor-state transaction, not a controller or RF verification. */
 final class OplusTransaction {
@@ -17,13 +16,12 @@ final class OplusTransaction {
     static final class State {
         final String mode, atqa, sak, uid, reportedUid;
         State(String mode, String atqa, String sak, String uid, String reportedUid) throws VendorFailure {
-            if (!("0".equals(mode) || "1".equals(mode))) throw failure("OPLUS_STATE_UNREADABLE");
-            this.mode = mode;
-            this.atqa = checkedHex(atqa, 4);
-            this.sak = checkedHex(sak, 2);
-            this.uid = checkedHex(uid, 8, 14, 20);
-            this.reportedUid = checkedHex(reportedUid, 8, 14, 20);
-            if (!this.uid.equals(this.reportedUid)) throw failure("OPLUS_STATE_UNREADABLE");
+            this.mode = OplusStateFormat.parse(OplusStateFormat.Field.MODE, mode);
+            this.atqa = OplusStateFormat.parse(OplusStateFormat.Field.ATQA, atqa);
+            this.sak = OplusStateFormat.parse(OplusStateFormat.Field.SAK, sak);
+            this.uid = OplusStateFormat.parse(OplusStateFormat.Field.UID, uid);
+            this.reportedUid = OplusStateFormat.parse(OplusStateFormat.Field.REPORTED_UID, reportedUid);
+            if (!this.uid.equals(this.reportedUid)) throw failure("OPLUS_UID_STATE_MISMATCH");
         }
         void requireBaseline() throws VendorFailure {
             // shortcut: only inactive, explicitly readable default/sentinel states; expand after ROM calibration.
@@ -100,11 +98,6 @@ final class OplusTransaction {
         byte[] result = new byte[value.length() / 2];
         for (int i = 0; i < result.length; i++) result[i] = (byte) Integer.parseInt(value.substring(i * 2, i * 2 + 2), 16);
         return result;
-    }
-    private static String checkedHex(String value, int... lengths) throws VendorFailure {
-        if (value != null && value.matches("[0-9a-fA-F]+"))
-            for (int length : lengths) if (value.length() == length) return value.toLowerCase(Locale.ROOT);
-        throw failure("OPLUS_STATE_UNREADABLE");
     }
     private static VendorFailure failure(String code) { return new VendorFailure("OPLUS_TRANSACTION", code, null); }
 }

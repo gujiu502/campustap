@@ -35,6 +35,9 @@ final class VendorFailure extends Exception {
             case "VENDOR_INTERFACE_UNAVAILABLE": return "尚未找到可安全啟用的 NFC 模擬介面，讀卡與卡片管理仍可使用。";
             case "OPLUS_FEATURE_UNAVAILABLE": return "此系統未開放直接卡片模擬功能，未更改 NFC 設定。";
             case "OPLUS_STATE_UNREADABLE": return "系統未完整提供原 NFC 狀態，無法安全啟用。";
+            case "OPLUS_STATE_MISSING": return "系統未提供必要的 NFC 初始狀態，暫不能啟用。請在設定複製相容性資訊。";
+            case "OPLUS_STATE_FORMAT_UNSUPPORTED": return "此系統回傳的 NFC 狀態格式尚未支援。請在設定複製相容性資訊。";
+            case "OPLUS_UID_STATE_MISMATCH": return "系統回傳的兩處卡片狀態不一致，已停止設定。請在設定複製相容性資訊。";
             case "OPLUS_SET_REJECTED": return "系統未接受卡片設定，已嘗試恢復原狀態。";
             case "OPLUS_ENABLE_MISMATCH": return "卡片設定回讀不一致，已嘗試恢復原狀態。";
             case "OPLUS_RESTORE_REJECTED": return "系統未接受恢復操作，已保留復原資料。";

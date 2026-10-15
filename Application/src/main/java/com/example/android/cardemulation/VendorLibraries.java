@@ -92,9 +92,9 @@ final class VendorLibraries {
             Object uid = api.getMethod("getHceTypeAUid").invoke(adapter);
             // No identity bytes or arbitrary vendor strings may enter the diagnostic report.
             String value = uid instanceof String ? (String) uid : "";
-            boolean valid = value.matches("(?i)(?:[0-9a-f]{8}|[0-9a-f]{14}|[0-9a-f]{20})");
+            boolean valid = "VALID".equals(OplusStateFormat.status(OplusStateFormat.Field.REPORTED_UID, value));
             return result.put("status", valid ? "IDENTITY_STATE_READABLE" : "NO_VALID_IDENTITY_STATE")
-                    .put("uidByteLength", valid ? value.length() / 2 : 0).put("rfVerified", false);
+                    .put("uidByteLength", valid ? OplusStateFormat.parse(OplusStateFormat.Field.REPORTED_UID, value).length() / 2 : 0).put("rfVerified", false);
         } catch (Exception | LinkageError error) {
             try { result.put("status", "READ_FAILED").put("errorType", VendorFailure.at("READ_OPLUS", error).errorType()); }
             catch (org.json.JSONException ignored) { }

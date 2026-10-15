@@ -1,6 +1,6 @@
 # CampusTap — 多卡片 NFC 门禁参数管理
 
-2026-10-15，版本 `0.7.0-oplus-direct`。新增一加／OPPO／Realme 的实验性直接设置与恢复路径，不要求无线调试或辅助 App，也不先索取 ST 的系统权限，见 [兼容性说明](docs/vendor-compatibility.md)。**新增代码尚无目标手机实测，不保证这些手机已能刷门禁；系统接口、功能开关或状态读取不足时仍会停止。** 原 Redmi 可用为用户反馈；既有功能证据见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
+2026-10-15，版本 `0.7.1-state-diagnostics`。一加用户反馈0.7.0状态检查失败；本版区分缺值、未知格式与 UID 状态不一致，兼容等价十六进制写法，设置页可复制不含卡号的兼容性信息。具体失败根因仍待目标手机信息确认，不能宣称该机模拟已修好。一加／OPPO／Realme 实验性直接路径无需无线调试或辅助 App，见 [兼容性说明](docs/vendor-compatibility.md)。原 Redmi 可用为用户反馈；既有证据见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
 
 
 [下载最新版安装包](https://github.com/gujiu502/campustap/releases/latest/download/CampusTap.apk) · [发布说明与校验码](https://github.com/gujiu502/campustap/releases/latest)
@@ -16,6 +16,7 @@
 - 启用失败区分未授权、缺少厂商接口、NFC关闭与配置异常。接口检测不依赖型号／ROM；所需方法缺失或原配置不匹配时拒绝写入。
 - 只加载 ROM 已有的固定位置 NFC 库。欧加须通过功能检测、完整停用状态读取与加密备份后才直接设置；返回 true 且厂商状态匹配才记录设置完成，不把它当成实际控制器或开门证明。NXP、Samsung、Huawei 仍只有检测。
 - 使用记录展示最近一次设置、恢复和失败，不编造刷卡或开门成功记录。
+- 设置页“複製相容性資訊”只在用户点击后读取型号、版本、接口及各状态字段检查结果，复制到本机剪贴板；不含卡号／UID 原值，不自动上传，无需调试连接。按钮使用现有样式，不增加工程页面或长说明弹窗。
 
 当前实现 ST 与实验性欧加接口的 NFC 识别参数设置，不按手机型号限制，**没有 Classic 密钥认证、扇区复制或原实体悠游卡支付导入**。自订卡片仅保存外观。没有操作悠游付、改变付款钱包、Root、解锁或联系校方。
 
@@ -42,7 +43,7 @@ adb devices -l
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 -Serial SERIAL
 ```
 
-发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 48 项 JVM 测试通过，lint 0 errors / 16 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
+发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 54 项 JVM 测试通过，lint 0 errors / 16 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
 
 | 文件 | 职责 |
 |---|---|
