@@ -1,3 +1,5 @@
+0.7.5 更新：同版RMX3370_13.1.0.601(CN01)官方OTA静态核查，确认setter存在而UID getter缺失，并有服务端海外模式／功能属性检查。新增逐方法状态、ST实际权限和只读服务／基线步骤、旧欧加只读属性／功能／白名单芯片标签；属性失败不代入false。Debug／Release各77项通过，lint均0 errors / 18 warnings（含Android11兼容属性／备份配置提醒）。复制真机运行、属性值、服务状态及实际模拟／恢复仍NOT RUN；未增加缺getter旧栈写入。
+
 0.7.4 更新：修复底部三栏中图示和文字TextView只垂直居中、实际靠左的问题；分别设置Gravity.CENTER。包含0.7.3全部接口改进。Debug／Release各70项既有测试通过，lint均0 errors / 16 warnings；无连接设备，UI真机视觉与realme模拟仍NOT RUN。
 
 0.7.3 更新：用户现已反馈0.7.2一加可用（此前诊断CPH2653）；未扩张为熄屏、重启或恢复实测。本版针对realme与共用接口：逐个旧平台／可信ROM候选做只读预检，开始写入后禁止换接口；schema2恢复资料绑定来源，schema1保留旧默认顺序。minSdk30可安装Android11；不等于私有模拟接口存在。Debug／Release各70项通过，lint均0 errors / 16 warnings；新增8项选择与恢复绑定测试。复查公开realme X3 Android11客户端，仅作历史样本，不冒充RMX3370系统；目标realme和本版OnePlus／Redmi回归、RF、熄屏、恢复、支付均 NOT RUN。以下保留历史证据。

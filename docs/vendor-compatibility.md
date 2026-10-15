@@ -1,6 +1,6 @@
 # 多品牌 NFC 接口核查
 
-2026-10-15，CampusTap 0.7.3。目标为本人实体卡的识别参数模拟，非 Root，不切换付款钱包。**保留 ST 与实验性欧加直接后端；无需无线调试或辅助App。** 用户现已反馈 0.7.2 在一加可用；此前对应诊断为 CPH2653 / Android16 / CPH2653_16.0.10.501(EX01)。这是用户实测反馈，未另行证明熄屏、重启或停用恢复。0.7.3面向 realme 和共用接口的自动选择，GT Neo 2 / RMX3370仍 NOT RUN，不要求用户先复制诊断才能执行只读预检。
+2026-10-15，CampusTap 0.7.5。目标为本人实体卡的识别参数模拟，非 Root，不切换付款钱包。**保留 ST 与实验性欧加直接后端；无需无线调试或辅助App。** 用户现已反馈 0.7.2 在一加可用；此前对应诊断为 CPH2653 / Android16 / CPH2653_16.0.10.501(EX01)。这是用户实测反馈，未另行证明熄屏、重启或停用恢复。0.7.5已核查RMX3370同版官方ROM，新增逐方法、实际权限、ST服务及旧欧加只读诊断。该realme的模拟适配仍未完成；不是移除型号限制即可解决。
 
 ## 判断标准
 
@@ -14,7 +14,7 @@ Android 公共 HCE 面向 ISO-DEP/APDU；没有设置任意固定 NFC-A UID 的�
 |---|---|---|
 | Xiaomi／Redmi／POCO | ST 后端不再限型号；增加库来源发现与路由接口完整性检查 | 既有 Redmi 用户反馈可用；其他机器须通过方法、WSS、91字节布局与基线检查，不承诺全系列 |
 | OPPO | 新增直接调用设置、厂商状态回读与停用恢复 | 实验性；须通过方法、功能开关、完整停用状态及回读检查；实机 NOT RUN [欧加研究] |
-| Realme | 同时检查旧平台和各可信 ROM 客户端，逐个只读预检；最低安装版本降至Android11 | GT Neo 2 / RMX3370仍 NOT RUN；历史realme客户端存在缺少身份方法的实例，不能仅按品牌放行。详见下文 [欧加研究] |
+| Realme | RMX3370同版Android13官方ROM：存在setter及feature，缺少UID getter；服务还检查海外与功能属性。新增分项诊断 | 当前完整接口检查会拒绝该旧栈；尚未实现旧合约写入。实际属性／ST服务／RF仍 NOT RUN。[同版ROM核查](realme-rmx3370-cn01.md) |
 | OnePlus | 保留明确MODE0且全空的初始状态处理；增加候选预检与恢复接口绑定 | 用户已反馈0.7.2可用；0.7.3回归、完整恢复与熄屏尚未实测 [欧加研究] |
 | Samsung | 识别 SamsungNfcAdapter；核对公开 Wallet NFC 接入与已分析的附件接口 | 附件通信不是固定 UID 后端；Wallet 要求接入配置，未接入 [三星] |
 | Huawei | 识别 HwNfcAdapter；核对 Wallet Kit 及旧 Android 扩展路由接口 | 路由选择不是任意 UID 设置；Wallet 为商户凭证接入，未接入 [华为] |
@@ -92,11 +92,11 @@ GT Neo 2 官方发布规格为Android11，旧APK要求Android12，缺少必要�
 
 ## 本轮验证
 
-Debug／Release各70项JVM测试；本版新增8项候选预检、空／活动／部分状态拒绝、恢复接口绑定、旧schema兼容与禁止写后换接口测试。仍覆盖初始状态、备份与写入先后、崩溃、部分生效、错误回读、外部变更、存储／服务失败。测试验证客户端协议，不证明厂商实现与假设相符。lint 0 errors / 16 warnings，签名延续旧版。用户反馈0.7.2一加可用；本版realme、OnePlus／Redmi回归、RF、熄屏、恢复、支付均 **NOT RUN**。
+0.7.5 Debug／Release各77项JVM测试，新增7项逐方法诊断、实际授权候选、芯片标签白名单、旧realme接口夹具及属性解析检查。保留既有状态、恢复、崩溃与存储／服务失败测试。测试验证客户端协议，不证明厂商实现与假设相符。lint 0 errors / 18 warnings，签名延续旧版。用户反馈0.7.2一加可用；本版realme、OnePlus／Redmi回归、RF、熄屏、恢复、支付均 **NOT RUN**。
 
 ## 无调试连接的排查
 
-升级后进入“设置 → 複製相容性資訊”，将文本粘贴给维护者。内容为型号／版本、当前后端候选、功能检测、MODE的0／1值、初始状态分类、字段受控标签与长度；有效UID仅报告是否一致，不输出UID原值。ST类存在不证明实际芯片为ST，报告明确标记芯片未验证。复制不执行setter、不读卡片文件、不上传；普通界面不展示工程字段或命令。[Android 剪贴板接口](https://developer.android.com/develop/ui/views/touch-and-input/copy-paste)
+升级后进入“设置 → 複製相容性資訊”，将文本粘贴给维护者。内容为型号／版本、当前后端候选、功能检测、MODE的0／1值、初始状态分类、字段受控标签与长度；有效UID仅报告是否一致，不输出UID原值。ST类存在不证明实际芯片为ST，报告明确标记芯片未验证。0.7.5另包含实际ST授权、服务连接与受限基线状态、各方法的受控标签、两个固定功能属性以及OEM芯片标签（不视为RF验证）。空属性和拒绝读取保持未知。复制不执行setter、不读卡片文件、不上传；普通界面不展示工程字段或命令。[Android 剪贴板接口](https://developer.android.com/develop/ui/views/touch-and-input/copy-paste)
 
 [欧加研究]: https://gist.github.com/PeronGH/8e272a007edfc192c0aff8d3a6b187da/dbf36c4faf2451d2e53f2b89cd73a5f21f736f9f
 [三星]: https://developer.samsung.com/wallet/addtosamsungwallet/nfccapabilities.html

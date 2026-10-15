@@ -77,12 +77,14 @@ final class VendorLibraries {
         return VendorCapabilities.unavailableCode(st, !st && oplusApi() != null);
     }
     static JSONObject describe(Context context) throws org.json.JSONException {
-        return new JSONObject().put("selectedBackendCandidate", VendorCardController.useOplus(context) ? "OPLUS_DIRECT_EXPERIMENTAL"
-                        : stClass() != null ? "ST" : "NONE")
+        boolean stPermission = VendorCardController.hasSystemPermission(context);
+        return new JSONObject().put("selectedBackendCandidate", VendorCapabilities.backendCandidate(stClass() != null, oplusApi() != null, stPermission))
                 .put("activeChipVerified", false)
                 .put("oplusCandidateCount", oplusEndpoints().size())
+                .put("oplusInterfaceChecks", oplusInterfaceChecks())
                 .put("st", new JSONObject().put("classPresent", find(VendorInterface.CLASS_NAME) != null)
-                        .put("requiredMethodsPresent", stClass() != null).put("runtimeBaselineCheckRequired", true))
+                        .put("requiredMethodsPresent", stClass() != null).put("systemPermissionGranted", stPermission)
+                        .put("runtimeBaselineCheckRequired", true))
                 .put("oplus", new JSONObject().put("classPresent", find(VendorCapabilities.OPLUS) != null)
                         .put("identityMethodsPresent", oplusApi() != null).put("writableBackendImplemented", true)
                         .put("experimental", true).put("readableInactiveBaselineRequired", true)
@@ -92,6 +94,59 @@ final class VendorLibraries {
                 .put("huawei", discovery(VendorCapabilities.HUAWEI, "ROUTING_API_IS_NOT_UID_EMULATION"))
                 .put("standardHce", new JSONObject().put("fixedUidApi", false))
                 .put("detectionOnly", true).put("servicePermissionAndRfVerified", false).put("uidLogged", false);
+    }
+    private static org.json.JSONArray oplusInterfaceChecks() throws org.json.JSONException {
+        org.json.JSONArray checks = new org.json.JSONArray();
+        checks.put(new JSONObject().put("source", "PLATFORM")
+                .put("methods", new JSONObject(VendorCapabilities.oplusMethodStatus(NfcAdapter.class))));
+        java.util.Set<Class<?>> seen = new java.util.HashSet<>();
+        for (java.util.Map.Entry<String, ClassLoader> source : Libraries.LOADERS.entrySet()) {
+            Class<?> factory = find(VendorCapabilities.OPLUS, source.getValue());
+            if (factory == null || !seen.add(factory)) continue;
+            Class<?> api = VendorCapabilities.oplusFactoryType(factory);
+            checks.put(new JSONObject().put("source", "ROM:" + source.getKey()).put("factoryTypeReadable", api != null)
+                    .put("methods", new JSONObject(VendorCapabilities.oplusMethodStatus(api))));
+        }
+        return checks;
+    }
+    static JSONObject legacyOplusCompatibility(Context context) throws org.json.JSONException {
+        JSONObject result = new JSONObject().put("mutationAttempted", false).put("uidLogged", false)
+                .put("overseaFlag", OplusSystemState.read(OplusSystemState.Flag.OVERSEA))
+                .put("accessCardFlag", OplusSystemState.read(OplusSystemState.Flag.ACCESS_CARD));
+        NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
+        if (nfc == null || !nfc.isEnabled()) return result.put("status", nfc == null ? "NFC_UNAVAILABLE" : "NFC_OFF");
+        java.util.Set<Class<?>> seen = new java.util.HashSet<>();
+        org.json.JSONArray clients = new org.json.JSONArray();
+        for (java.util.Map.Entry<String, ClassLoader> source : Libraries.LOADERS.entrySet()) {
+            Class<?> factory = find(VendorCapabilities.OPLUS, source.getValue());
+            Class<?> api = VendorCapabilities.oplusFactoryType(factory);
+            if (api == null || !seen.add(factory)) continue;
+            JSONObject client = new JSONObject().put("source", "ROM:" + source.getKey());
+            try {
+                java.lang.reflect.Method feature = api.getMethod("hasFeature", String.class);
+                if (feature.getReturnType() != boolean.class || java.lang.reflect.Modifier.isStatic(feature.getModifiers()))
+                    throw new NoSuchMethodException();
+                Object adapter = factory.getMethod("getVendorNfcAdapter").invoke(null);
+                if (adapter == null || !api.isInstance(adapter)) client.put("status", "SERVICE_UNAVAILABLE");
+                else {
+                    client.put("status", "FEATURE_READ_COMPLETE").put("featureEnabled", Boolean.TRUE.equals(feature.invoke(adapter, "HCE_ACCESSCARD")));
+                    try {
+                        java.lang.reflect.Method chip = api.getMethod("getNfcc");
+                        if (chip.getReturnType() != String.class || java.lang.reflect.Modifier.isStatic(chip.getModifiers()))
+                            throw new NoSuchMethodException();
+                        Object value = chip.invoke(adapter);
+                        client.put("reportedChip", VendorCapabilities.chipIdentifier(value instanceof String ? (String) value : null))
+                                .put("chipInfoSource", "OEM_API_NOT_RF_VERIFICATION");
+                    } catch (Exception | LinkageError error) {
+                        client.put("chipReadStatus", "READ_FAILED").put("chipReadErrorType", VendorFailure.at("OPLUS_READ_ONLY", error).errorType());
+                    }
+                }
+            } catch (Exception | LinkageError error) {
+                client.put("status", "READ_FAILED").put("errorType", VendorFailure.at("OPLUS_READ_ONLY", error).errorType());
+            }
+            clients.put(client);
+        }
+        return result.put("clients", clients).put("status", "READ_ONLY_CHECK_COMPLETE");
     }
     private static JSONObject discovery(String name, String reason) throws org.json.JSONException {
         return new JSONObject().put("classPresent", find(name) != null).put("writableBackendImplemented", false).put("reason", reason);

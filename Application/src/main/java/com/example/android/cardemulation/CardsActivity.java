@@ -448,7 +448,9 @@ public final class CardsActivity extends Activity {
                         .put("manufacturer", android.os.Build.MANUFACTURER).put("model", android.os.Build.MODEL)
                         .put("android", android.os.Build.VERSION.RELEASE).put("sdk", android.os.Build.VERSION.SDK_INT)
                         .put("systemBuild", android.os.Build.DISPLAY).put("capabilities", VendorLibraries.describe(this))
-                        .put("oplus", new OplusCardController(this).compatibility()).put("uidLogged", false);
+                        .put("oplus", new OplusCardController(this).compatibility())
+                        .put("legacyOplus", VendorLibraries.legacyOplusCompatibility(this))
+                        .put("st", VendorProbe.stCompatibility(this)).put("uidLogged", false);
                 String text = report.toString(2);
                 runOnUiThread(() -> {
                     if (!visible || isFinishing()) return;

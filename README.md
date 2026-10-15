@@ -1,6 +1,6 @@
 # CampusTap — 多卡片 NFC 门禁参数管理
 
-2026-10-15，版本 `0.7.4-centered-navigation`。底部三项导航的图示与文字现分别在等宽栏内置中。用户已反馈 0.7.2 在一加可用；这是用户实测反馈，不扩大为所有一加机型或完整恢复验证。此版面向 realme／OPPO／OnePlus 共用接口，修复“首个类存在就挡住其他接口”的选择问题：点击启用时自动逐个做只读预检，通过后才备份并设置，不要求先复制诊断。恢复绑定实际使用的接口，不连续试写。**GT Neo 2 / RMX3370 尚未实测，不能宣称已经修好。** 见 [逐品牌兼容性与 realme 核查](docs/vendor-compatibility.md)。原 Redmi 可用为用户反馈；既有证据见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
+2026-10-15，版本 `0.7.5-realme-contract-check`。已核查用户RMX3370 / Android13 / RMX3370_13.1.0.601(CN01)同版官方OTA：身份setter存在、UID getter缺失，服务还检查海外模式与HCE开关。此版补充逐方法结果、实际ST权限／服务与旧欧加只读模式／芯片报告，**没有新增已验证的realme模拟后端**。保留底部导航置中与既有写入／恢复流程。一加0.7.2与原Redmi可用为用户反馈；新版回归及realme运行仍NOT RUN。见[同版ROM证据](docs/realme-rmx3370-cn01.md)、[逐品牌兼容性](docs/vendor-compatibility.md)。
 
 
 [下载最新版安装包](https://github.com/gujiu502/campustap/releases/latest/download/CampusTap.apk) · [发布说明与校验码](https://github.com/gujiu502/campustap/releases/latest)
@@ -44,7 +44,7 @@ adb devices -l
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 -Serial SERIAL
 ```
 
-发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 70 项 JVM 测试通过，lint 0 errors / 16 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
+发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 77 项 JVM 测试通过，lint 0 errors / 18 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
 
 | 文件 | 职责 |
 |---|---|
