@@ -25,12 +25,12 @@ final class VendorFailure extends Exception {
     }
     String description() {
         if ("SecurityException".equals(errorType()) || "PERMISSION_REQUIRED".equals(code))
-            return "尚未取得系統 NFC 設定權限，請查看授權方式並完成一次電腦授權。";
+            return "未取得卡片模擬所需的系統權限，無法在 App 內直接取得。";
         switch (code) {
-            case "NFC_PERMISSION_REQUIRED": return "尚未取得基本 NFC 權限，請檢查安裝來源並重新安裝完整安裝包。";
+            case "NFC_PERMISSION_REQUIRED": return "系統未授予基本 NFC 存取權限。";
             case "NFC_OFF": return "請先開啟 NFC";
             case "NFC_UNAVAILABLE": return "此手機未提供 NFC 功能。";
-            case "UNVERIFIED_DEVICE": return "此機型或系統版本尚未支援卡片模擬，並非一般 NFC 權限問題。授權後也需先完成裝置適配。";
+            case "UNVERIFIED_DEVICE": return "此手機尚未完成卡片模擬裝置適配。";
             case "PROFILE_REQUIRED": return "請先感應本人學生證，錄入門卡參數";
             case "NO_NCI_READBACK": return "系統未回傳此 NFC 參數，不能安全設定";
             case "NO_CONTROLLER_READBACK": return "無法讀取控制器原配置，不能安全設定";

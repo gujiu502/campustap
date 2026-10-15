@@ -18,13 +18,20 @@ public class VendorFailureTest {
         VendorFailure device = new VendorFailure("CHECK_DEVICE", "UNVERIFIED_DEVICE", null);
         VendorFailure off = new VendorFailure("CHECK_NFC", "NFC_OFF", null);
         assertTrue(permission.needsAuthorization());
-        assertTrue(permission.description().contains("電腦授權"));
+        assertTrue(permission.description().contains("無法在 App 內直接取得"));
         assertFalse(device.needsAuthorization());
         assertTrue(device.description().contains("裝置適配"));
         assertFalse(off.needsAuthorization());
         assertTrue(off.description().contains("開啟 NFC"));
         assertFalse(new VendorFailure("CHECK_NFC", "NFC_UNAVAILABLE", null).needsAuthorization());
         assertTrue(VendorFailure.at("PROGRAM", new InvocationTargetException(new SecurityException())).needsAuthorization());
+    }
+    @Test public void systemPermissionFailureDoesNotOfferAFalseRuntimePromptOrCommands() {
+        String message = new VendorFailure("CHECK_PERMISSION", "PERMISSION_REQUIRED", null).description();
+        assertFalse(message.contains("adb"));
+        assertFalse(message.contains("電腦"));
+        assertFalse(message.contains("重新申請"));
+        assertTrue(message.contains("系統權限"));
     }
     @Test public void unwrapsReflectionAndNeverExportsTheExceptionMessage() {
         VendorFailure failure = VendorFailure.at("PROGRAM_TEST_CONFIGURATION", new InvocationTargetException(

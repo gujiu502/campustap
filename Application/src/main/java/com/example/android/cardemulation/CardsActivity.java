@@ -51,7 +51,6 @@ public final class CardsActivity extends Activity {
     private boolean recoveryOpened;
     private boolean applyDefaultOnResume = true, activationBusy, visible;
     private boolean authorizationGate;
-    private AlertDialog authorizationDialog;
     private final android.os.Handler authorizationHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable authorizationCheck = this::checkAuthorization;
     private VendorFailure activationFailure;
@@ -77,14 +76,13 @@ public final class CardsActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         visible = true;
-        if (!NfcSetup.hasAuthorization(this)) { showAuthorizationGate(); showNfcSetup(); return; }
+        if (!NfcSetup.hasBasicAuthorization(this)) { showAuthorizationGate(); return; }
         resumeAuthorized();
     }
     private void resumeAuthorized() {
         if (!visible) return;
-        if (!NfcSetup.hasAuthorization(this)) { showAuthorizationGate(); return; }
+        if (!NfcSetup.hasBasicAuthorization(this)) { showAuthorizationGate(); return; }
         authorizationGate = false; authorizationHandler.removeCallbacks(authorizationCheck);
-        if (authorizationDialog != null) { authorizationDialog.dismiss(); authorizationDialog = null; }
         if (store == null) return;
         try { store = new CardStore(this); store.syncProfiles(this); }
         catch (Exception error) { message("卡片同步失敗；原資料已保留"); }
@@ -102,23 +100,18 @@ public final class CardsActivity extends Activity {
     private void showAuthorizationGate() {
         authorizationGate = true; applyDefaultOnResume = true;
         if (sheet != null && sheet.isShowing()) sheet.dismiss();
-        base("先完成 NFC 授權", true);
+        base("NFC 無法使用", true);
         LinearLayout gate = panel();
-        gate.addView(label("授權完成後才能繼續", 22, INK, true));
-        gate.addView(label("每次啟動及返回軟體都會重新檢查。授權未通過時，不會進入卡片頁、讀卡或啟用預設卡片。", 14, MUTED, false));
-        gate.addView(label(NfcSetup.summary(this), 14, MUTED, false));
-        gate.addView(action("前往授權", true, this::showNfcSetup));
-        gate.addView(action("重新檢查授權", false, () -> {
-            if (NfcSetup.hasAuthorization(this)) resumeAuthorized();
-            else { showAuthorizationGate(); showNfcSetup(); }
-        }));
-        gate.addView(label("完成授權後會自動繼續。關閉說明不會跳過授權檢查。", 13, MUTED, false));
+        gate.addView(label("基本 NFC 權限未就緒", 22, INK, true));
+        gate.addView(label("系統未授予基本 NFC 存取權限。", 14, MUTED, false));
+        gate.addView(action("重新檢查", true, this::checkAuthorization));
+        gate.addView(action("離開", false, this::finish));
         body.addView(gate); authorizationHandler.removeCallbacks(authorizationCheck);
         if (visible) authorizationHandler.postDelayed(authorizationCheck, 1000);
     }
     private void checkAuthorization() {
         if (!visible || !authorizationGate) return;
-        if (NfcSetup.hasAuthorization(this)) resumeAuthorized();
+        if (NfcSetup.hasBasicAuthorization(this)) resumeAuthorized();
         else authorizationHandler.postDelayed(authorizationCheck, 1000);
     }
     @Override protected void onSaveInstanceState(Bundle saved) {
@@ -129,7 +122,6 @@ public final class CardsActivity extends Activity {
     }
     @Override protected void onDestroy() {
         authorizationHandler.removeCallbacks(authorizationCheck);
-        if (authorizationDialog != null) authorizationDialog.dismiss();
         if (sheet != null && sheet.isShowing()) sheet.dismiss();
         if (isFinishing()) discardPendingImage();
         super.onDestroy();
@@ -163,7 +155,7 @@ public final class CardsActivity extends Activity {
         if (!editing) navigation();
     }
     private void showPage(String next) {
-        if (!NfcSetup.hasAuthorization(this)) { showAuthorizationGate(); return; }
+        if (!NfcSetup.hasBasicAuthorization(this)) { showAuthorizationGate(); return; }
         page = next; base("history".equals(page) ? "使用紀錄" : "settings".equals(page) ? "設定" : "我的卡片", false);
         if ("cards".equals(page)) showCards(); else if ("history".equals(page)) showHistory(); else showSettings();
     }
@@ -209,7 +201,6 @@ public final class CardsActivity extends Activity {
         state.addView(label(!activationMessage.isEmpty() ? activationMessage : "點卡片即可啟用，右上角三點可編輯。NFC 付款前請暫停模擬；熄屏開門仍需實際驗證。", 13, MUTED, false));
         if (configured) state.addView(action("暫停模擬", false, () -> openFlow("restore", null)));
         else if (!store.defaultId.isEmpty()) state.addView(action("啟用預設卡片", true, () -> activateCard(store.defaultId)));
-        if (activationFailure != null) state.addView(action(activationFailure.needsAuthorization() ? "查看授權方式" : "查看相容性", false, this::showNfcSetup));
         body.addView(state);
     }
     private void showCardMenu(View anchor, CardAppearance card) {
@@ -227,7 +218,7 @@ public final class CardsActivity extends Activity {
         }); menu.show();
     }
     private void activateCard(String id) {
-        if (!NfcSetup.hasAuthorization(this)) { showAuthorizationGate(); return; }
+        if (!NfcSetup.hasBasicAuthorization(this)) { showAuthorizationGate(); return; }
         if (activationBusy) return;
         CardAppearance selected = null;
         for (CardAppearance card : store.cards) if (card.id.equals(id)) selected = card;
@@ -291,7 +282,7 @@ public final class CardsActivity extends Activity {
     }
     private void edit(CardAppearance card) { draft = card.copy(); draftDefault = card.id.equals(store.defaultId); showEditor(); }
     private void showEditor() {
-        if (!NfcSetup.hasAuthorization(this)) { showAuthorizationGate(); return; }
+        if (!NfcSetup.hasBasicAuthorization(this)) { showAuthorizationGate(); return; }
         base("編輯卡片", true);
         CardFace preview = new CardFace(this, draft, draftDefault); body.addView(preview, spaced(-1, -2, 0, 24));
         LinearLayout form = panel(); form.addView(label("卡片名稱", 15, INK, true));
@@ -431,9 +422,9 @@ public final class CardsActivity extends Activity {
         if (!found) { body.addView(label("尚無使用紀錄", 22, INK, true)); body.addView(label("卡片啟用與暫停結果會顯示於此。", 14, MUTED, false)); }
     }
     private void showSettings() {
-        LinearLayout permissions = panel(); permissions.addView(label("NFC 授權與相容性", 20, INK, true));
+        LinearLayout permissions = panel(); permissions.addView(label("NFC 狀態", 20, INK, true));
         permissions.addView(label(NfcSetup.summary(this), 14, MUTED, false));
-        permissions.addView(action("查看授權方式", false, this::showNfcSetup)); body.addView(permissions, spaced(-1, -2, 0, 16));
+        permissions.addView(action("NFC 設定", false, () -> NfcSetup.openSettings(this))); body.addView(permissions, spaced(-1, -2, 0, 16));
         LinearLayout status = panel(); status.addView(label("NFC 與門禁", 20, INK, true));
         status.addView(label("是否能開門，請以現場門禁結果為準。目前不支援添加原實體悠遊卡的支付功能。", 14, MUTED, false));
         status.addView(action("暫停模擬並恢復 NFC", true, () -> openFlow("restore", null))); body.addView(status, spaced(-1, -2, 0, 16));
@@ -443,17 +434,8 @@ public final class CardsActivity extends Activity {
         if (BuildConfig.DEBUG) version.setOnLongClickListener(v -> { startActivity(new Intent(this, MainActivity.class)); return true; });
         privacy.addView(version); body.addView(privacy);
     }
-    private void showNfcSetup() {
-        if (authorizationDialog != null && authorizationDialog.isShowing()) return;
-        authorizationDialog = NfcSetup.show(this, () -> {
-            if (!NfcSetup.hasAuthorization(this)) { showAuthorizationGate(); return; }
-            if (authorizationGate) { resumeAuthorized(); return; }
-            if (!store.defaultId.isEmpty()) activateCard(store.defaultId);
-            else { showPage(page); VendorFailure failure = VendorCardController.readinessFailure(this); message(failure == null ? "NFC 授權與裝置檢查通過" : failure.description()); }
-        });
-    }
     private void openFlow(String mode, String type) {
-        if (!NfcSetup.hasAuthorization(this)) { showAuthorizationGate(); return; }
+        if (!NfcSetup.hasBasicAuthorization(this)) { showAuthorizationGate(); return; }
         if ("read".equals(mode)) applyDefaultOnResume = true;
         recoveryOpened = true; // The flow owns its asynchronous restore when returning here.
         startActivity(new Intent(this, NfcFlowActivity.class).putExtra("mode", mode).putExtra("cardType", type));
