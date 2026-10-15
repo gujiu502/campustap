@@ -1,3 +1,5 @@
+0.6.5 更新：扩展欧加三处固定 ROM 库加载，检查新 vendor 工厂与旧 NfcAdapter 身份方法。ST 后端须完整具备路由读取方法；写入及恢复均使用已选扩展的类加载器。Oplus／NXP／Samsung／Huawei 后台只读识别不代表可写支持；欧加缺恢复接口时不写入、不引导申请 ST 权限。Debug／Release各29项通过，lint均0 errors / 16 warnings。新增路径、欧加服务读取、其他品牌实际模拟、原Redmi回归均 NOT RUN。详见 [逐品牌核查](vendor-compatibility.md)。以下保留历史版本证据。
+
 0.6.4 更新：移除 App 与部署／采集脚本的型号、ROM白名单。改为检测实际ST扩展接口与所需方法，保留授权、加密快照、写入及恢复回读。当前只接受已校准91字节控制器布局与NCI基线。Debug／Release各24项通过、lint均0 errors / 16 warnings；编译后无型号条件、接口探测和签名隔离核验通过。当前无连接设备，Realme实际模拟 NOT RUN。以下保留历史版本证据。
 
 0.6.3 更新：修复0.6.2将系统特权当作整个App准入条件的问题。基本NFC授权即可进入软件与读卡；模拟仍须完整授权与设备适配。删除普通UI长弹窗、ADB命令与前往授权按钮；Debug／Release各21项通过、lint均0 errors / 16 warnings，签名连续与调试隔离通过。用户确认截图为Realme GT Neo 2 / RMX3370，但当前无法接机，先发布界面修复；该机模拟适配及新版真机运行 NOT RUN。下文为历史版本证据。

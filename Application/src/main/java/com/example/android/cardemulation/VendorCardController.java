@@ -130,7 +130,7 @@ final class VendorCardController {
                 for (int id : RadioConfiguration.PARAMETERS) {
                     same &= RadioConfiguration.restoredParameter(id, decode(parameters.getString(Integer.toHexString(id))), nci(adapter, id));
                 }
-                same &= before.getJSONObject("routes").toString().equals(routes().toString());
+                same &= before.getJSONObject("routes").toString().equals(routes(adapter).toString());
                 if (!same) throw new VendorFailure(stage, "RESTORE_READBACK_MISMATCH", null);
                 stage = "CLEAR_VERIFIED_ROLLBACK";
                 state.delete(ROLLBACK);
@@ -154,7 +154,8 @@ final class VendorCardController {
         if (failure != null) throw failure;
     }
     static VendorFailure readinessFailure(Context context) {
-        if (!hasVendorInterface()) return new VendorFailure("CHECK_INTERFACE", "VENDOR_INTERFACE_UNAVAILABLE", null);
+        String unavailable = VendorLibraries.unavailableCode();
+        if (!unavailable.isEmpty()) return new VendorFailure("CHECK_INTERFACE", unavailable, null);
         VendorFailure authorization = NfcSetup.authorizationFailure(context);
         if (authorization != null) return authorization;
         NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
@@ -165,10 +166,13 @@ final class VendorCardController {
         return context.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == PackageManager.PERMISSION_GRANTED;
     }
     static boolean hasVendorInterface() {
-        try { return VendorInterface.compatible(Class.forName(VendorInterface.CLASS_NAME, false, VendorCardController.class.getClassLoader())); }
-        catch (ClassNotFoundException | SecurityException | LinkageError unavailable) { return false; }
+        return VendorLibraries.stClass() != null;
     }
-    private Object adapter() throws Exception { return Class.forName(VendorInterface.CLASS_NAME).getConstructor().newInstance(); }
+    private Object adapter() throws Exception {
+        Class<?> type = VendorLibraries.stClass();
+        if (type == null) throw new VendorFailure("CONNECT_VENDOR_SERVICE", "VENDOR_INTERFACE_UNAVAILABLE", null);
+        return type.getConstructor().newInstance();
+    }
     private byte[] controller(Object adapter) throws Exception {
         try {
             Object value = adapter.getClass().getMethod("sendPropGetConfig", int.class, int.class).invoke(adapter, 4, 0);
@@ -190,8 +194,8 @@ final class VendorCardController {
                 byte.class, byte[].class, byte.class, byte[].class);
         method.invoke(adapter, enabled, atqa0, atqa1, sak, uid, rats.length == 0 ? (byte) 0 : rats[0], history);
     }
-    private JSONObject routes() throws Exception {
-        Class<?> settings = Class.forName("com.st.android.nfc_extensions.NfcSettingsAdapter");
+    private JSONObject routes(Object controller) throws Exception {
+        Class<?> settings = Class.forName(VendorLibraries.ST_SETTINGS, true, controller.getClass().getClassLoader());
         Object adapter = settings.getMethod("getDefaultAdapter", Context.class).invoke(null, context);
         if (adapter == null) throw new VendorFailure("READ_ROUTES", "SERVICE_UNAVAILABLE", null);
         Object value = settings.getMethod("getUserDefaultRoutes").invoke(adapter);
@@ -205,7 +209,7 @@ final class VendorCardController {
     private JSONObject snapshot(Object adapter) throws Exception {
         JSONObject parameters = new JSONObject();
         for (int id : RadioConfiguration.PARAMETERS) parameters.put(Integer.toHexString(id), encode(nci(adapter, id)));
-        return new JSONObject().put("controller", encode(controller(adapter))).put("nci", parameters).put("routes", routes());
+        return new JSONObject().put("controller", encode(controller(adapter))).put("nci", parameters).put("routes", routes(adapter));
     }
     private java.util.Map<Integer, byte[]> parameters(JSONObject json) throws Exception {
         java.util.Map<Integer, byte[]> values = new java.util.HashMap<>();

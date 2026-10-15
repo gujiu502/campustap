@@ -14,11 +14,14 @@ public final class VendorProbe {
                 .put("secureSettingsPermission", context.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS")
                         == PackageManager.PERMISSION_GRANTED ? "GRANTED" : "DENIED")
                 .put("mutationAttempted", false).put("rfParametersChanged", false)
-                .put("doorUnlockStatus", "NOT_TESTED");
+                .put("doorUnlockStatus", "NOT_TESTED")
+                .put("vendorCapabilities", VendorLibraries.describe())
+                .put("oplusReadOnly", VendorLibraries.readOplusUidStatus(context));
         JSONArray operations = new JSONArray();
         report.put("operationsAttempted", operations);
         try {
-            Class<?> extension = Class.forName("com.st.android.nfc_extensions.NfcAdapterStExtensions");
+            Class<?> extension = VendorLibraries.stClass();
+            if (extension == null) return report.put("readStatus", "ST_API_UNAVAILABLE");
             extension.getMethod("programHceParameters", boolean.class, byte.class, byte.class,
                     byte.class, byte[].class, byte.class, byte[].class);
             report.put("hceParameterMethodPresent", true);
@@ -47,7 +50,7 @@ public final class VendorProbe {
                 }
                 report.put("nonIdentityNciParameters", nci).put("nciParameterLengths", lengths);
             }
-            Class<?> settings = Class.forName("com.st.android.nfc_extensions.NfcSettingsAdapter");
+            Class<?> settings = Class.forName(VendorLibraries.ST_SETTINGS, true, extension.getClassLoader());
             Object adapter = settings.getMethod("getDefaultAdapter", Context.class).invoke(null, context);
             operations.put("getDefaultAdapter");
             if (adapter == null) return report.put("readStatus", "SERVICE_UNAVAILABLE");

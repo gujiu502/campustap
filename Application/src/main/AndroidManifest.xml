@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.NFC" />
-    <!-- This ROM also marks WSS as development; only an explicit ADB grant can enable the probe. -->
+    <!-- The existing ST write backend needs WSS; this is not a runtime NFC permission. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
@@ -10,6 +10,7 @@
         android:icon="@drawable/ic_launcher" android:theme="@style/CampusTheme"
         android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
         <uses-library android:name="com.st.android.nfc_extensions" android:required="false" />
+        <uses-library android:name="com.nxp.nfc" android:required="false" />
         <activity android:name=".MainActivity" android:exported="false" />
         <activity android:name=".NfcFlowActivity" android:exported="false" />
         <receiver android:name=".NfcStartupReceiver" android:exported="true" android:permission="android.permission.WRITE_SECURE_SETTINGS">

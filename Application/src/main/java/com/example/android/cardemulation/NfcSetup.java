@@ -19,7 +19,9 @@ final class NfcSetup {
     static boolean hasAuthorization(Context context) { return authorizationFailure(context) == null; }
     static String summary(Activity activity) {
         NfcAdapter nfc = NfcAdapter.getDefaultAdapter(activity);
-        String simulation = !VendorCardController.hasVendorInterface() ? "系統未提供相容介面"
+        String unavailable = VendorLibraries.unavailableCode();
+        String simulation = "OPLUS_RESTORE_UNAVAILABLE".equals(unavailable) ? "已找到介面，尚缺安全恢復適配"
+                : !unavailable.isEmpty() ? "尚無可安全啟用的介面"
                 : VendorCardController.hasSystemPermission(activity) ? "可嘗試啟用" : "未取得系統授權";
         return "NFC：" + (nfc == null ? "不支援" : nfc.isEnabled() ? "已開啟" : "未開啟") + "\n卡片模擬：" + simulation;
     }

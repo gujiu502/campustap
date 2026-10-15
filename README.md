@@ -1,6 +1,6 @@
 # CampusTap — 多卡片 NFC 门禁参数管理
 
-2026-10-15，版本 `0.6.4-interface-detection`。0.6.0 已在 Redmi 验证实际贴卡连续添加、点击切换、默认卡启动启用，以及后台锁屏后的配置保留；0.6.4 的接口自动检测尚未真机复测。**用户已确认自己的 Redmi 可以使用；这是用户实测反馈。已移除型号／ROM白名单，按实际厂商接口判断；未提供相同接口的手机仍不能模拟。** 见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
+2026-10-15，版本 `0.6.5-vendor-discovery`。本轮扩展 ROM 库加载、欧加新旧接口发现及多品牌只读识别，见 [逐品牌核查表](docs/vendor-compatibility.md)。**当前可写后端仍只有 ST，欧加写入尚未实现，不能称为全品牌通用模拟版。用户已确认原 Redmi 可以使用；新增库路径和其他手机尚未真机验证。** 既有功能证据见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
 
 
 [下载最新版安装包](https://github.com/gujiu502/campustap/releases/latest/download/CampusTap.apk) · [发布说明与校验码](https://github.com/gujiu502/campustap/releases/latest)
@@ -14,6 +14,7 @@
 - 普通流程没有“门禁测试”或工程参数界面。debug 可长按设置页版本文字进入内部开发页；只读后台探针仅打包到 debug，要求发送方有系统 DUMP 权限。
 - 普通界面移除长授权说明、电脑命令和“前往授权”按钮。启动只检查基本 NFC，已授权即可进入列表、编辑和读卡；系统特权仅在实际卡片模拟时严格检查，不再锁住整个软件。
 - 启用失败区分未授权、缺少厂商接口、NFC关闭与配置异常。接口检测不依赖型号／ROM；所需方法缺失或原配置不匹配时拒绝写入。
+- 扩展欧加三处固定系统库路径及可选 NXP 共享库声明；ST 额外检查原路由读取能力。只加载 ROM 中已有库。欧加、NXP、Samsung、Huawei 的后台识别不代表可写支持；欧加缺少完整原配置与恢复验证时不会误导申请 ST 权限。
 - 使用记录展示最近一次设置、恢复和失败，不编造刷卡或开门成功记录。
 
 当前实现 ST 扩展接口的 OEM NFC 识别参数设置，不再按手机型号限制，**没有 Classic 密钥认证、扇区复制或原实体悠游卡支付导入**。自订卡片仅保存外观。没有操作悠游付、改变付款钱包、Root、解锁或联系校方。
@@ -41,7 +42,7 @@ adb devices -l
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 -Serial SERIAL
 ```
 
-发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 24 项 JVM 测试通过，lint 0 errors / 16 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
+发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 29 项 JVM 测试通过，lint 0 errors / 16 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
 
 | 文件 | 职责 |
 |---|---|
@@ -49,6 +50,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 -Serial S
 | NfcFlowActivity | 贴卡自动添加、暂停恢复，不输出工程细节 |
 | CardStore / CardAppearance | 多卡元数据、默认选择、旧版迁移与文件边界 |
 | VendorCardController / RadioConfiguration | 串行设置、加密恢复快照、严格配置检查与回读 |
+| VendorLibraries / VendorCapabilities | 固定系统库发现、类型检查及多厂商只读识别 |
 | NfcStartupReceiver | NFC 开启后启用默认卡，尊重主动暂停 |
 | MainActivity | 隐藏开发工具，限时实验与正式持久启用分离 |
 | AccessCardProfile / PrivateState | 卡形态限制、AndroidKeyStore AES-GCM 存储 |

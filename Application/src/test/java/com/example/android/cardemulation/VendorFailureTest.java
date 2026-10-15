@@ -47,4 +47,11 @@ public class VendorFailureTest {
         assertEquals("ValidationFailure", failure.errorType());
         assertTrue(failure.description().contains("不能安全設定"));
     }
+    @Test public void foundOplusApiDoesNotRequestAnIrrelevantStPermission() {
+        VendorFailure failure = new VendorFailure("CHECK_INTERFACE", "OPLUS_RESTORE_UNAVAILABLE", null);
+        assertFalse(failure.needsAuthorization());
+        assertTrue(failure.description().contains("恢復"));
+        assertFalse(failure.description().contains("授權"));
+        assertFalse(failure.description().contains("adb"));
+    }
 }
