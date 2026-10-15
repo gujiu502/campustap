@@ -5,10 +5,10 @@ android {
     buildFeatures { buildConfig true }
     defaultConfig {
         applicationId 'tw.campustap.diagnostics'
-        minSdk 31
+        minSdk 30
         targetSdk 35
-        versionCode 16
-        versionName '0.7.2-inactive-initial-state'
+        versionCode 17
+        versionName '0.7.3-interface-selection'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

@@ -1,6 +1,6 @@
 # 多品牌 NFC 接口核查
 
-2026-10-15，CampusTap 0.7.2。目标为本人实体卡的识别参数模拟，非 Root，不切换付款钱包。**保留 ST 与实验性欧加直接后端；无需无线调试或辅助App。** 用户的 CPH2653 / Android16 / CPH2653_16.0.10.501(EX01) 报告证明接口和功能检测成功，身份字段与UID getter全空，且无待恢复资料；MODE仅知格式有效，未获0／1值。新增严格的“明确停用且全空”初始分支；实际设置、恢复与门禁尚未验证。
+2026-10-15，CampusTap 0.7.3。目标为本人实体卡的识别参数模拟，非 Root，不切换付款钱包。**保留 ST 与实验性欧加直接后端；无需无线调试或辅助App。** 用户现已反馈 0.7.2 在一加可用；此前对应诊断为 CPH2653 / Android16 / CPH2653_16.0.10.501(EX01)。这是用户实测反馈，未另行证明熄屏、重启或停用恢复。0.7.3面向 realme 和共用接口的自动选择，GT Neo 2 / RMX3370仍 NOT RUN，不要求用户先复制诊断才能执行只读预检。
 
 ## 判断标准
 
@@ -14,8 +14,8 @@ Android 公共 HCE 面向 ISO-DEP/APDU；没有设置任意固定 NFC-A UID 的�
 |---|---|---|
 | Xiaomi／Redmi／POCO | ST 后端不再限型号；增加库来源发现与路由接口完整性检查 | 既有 Redmi 用户反馈可用；其他机器须通过方法、WSS、91字节布局与基线检查，不承诺全系列 |
 | OPPO | 新增直接调用设置、厂商状态回读与停用恢复 | 实验性；须通过方法、功能开关、完整停用状态及回读检查；实机 NOT RUN [欧加研究] |
-| Realme | 旧平台方法与新 vendor 客户端均可进入同一直接调用流程 | GT Neo 2 / RMX3370 仍 NOT RUN；旧 ROM 方法或状态不足时拒绝写入 [欧加研究] |
-| OnePlus | 固定 ROM 库加载、有类型的静态工厂、直接设置／恢复；明确MODE0且全空的初始状态处理 | CPH2653用户只读报告确认接口／功能可读；实际写入及RF NOT RUN，不等于已能开门 [欧加研究] |
+| Realme | 同时检查旧平台和各可信 ROM 客户端，逐个只读预检；最低安装版本降至Android11 | GT Neo 2 / RMX3370仍 NOT RUN；历史realme客户端存在缺少身份方法的实例，不能仅按品牌放行。详见下文 [欧加研究] |
+| OnePlus | 保留明确MODE0且全空的初始状态处理；增加候选预检与恢复接口绑定 | 用户已反馈0.7.2可用；0.7.3回归、完整恢复与熄屏尚未实测 [欧加研究] |
 | Samsung | 识别 SamsungNfcAdapter；核对公开 Wallet NFC 接入与已分析的附件接口 | 附件通信不是固定 UID 后端；Wallet 要求接入配置，未接入 [三星] |
 | Huawei | 识别 HwNfcAdapter；核对 Wallet Kit 及旧 Android 扩展路由接口 | 路由选择不是任意 UID 设置；Wallet 为商户凭证接入，未接入 [华为] |
 | Honor | 核查原生钱包门禁支持；Android 机仍按实际接口检测 | 官方钱包能力不等于第三方接口，未取得可实现的 UID／恢复接口 [荣耀] |
@@ -68,9 +68,31 @@ NXP 旧扩展可提供路由、固件、配置写入方法；不具备已验证�
 - [Samsung 扩展分析源码，30cd25b](https://github.com/488315/samsung_framework/blob/30cd25b68f67be792ab78fb46fb9f63af0964522/services/sources/com/samsung/android/nfc/adapter/SamsungNfcAdapter.java)（非官方 API 合约）
 - [Huawei 扩展分析源码，672bb34](https://github.com/dstmath/HWFramework/blob/672bb34094b8780806a10ba9b1d21036fd808b8e/MATE-20_EMUI_11.0.0/src/main/java/com/huawei/nfc/HwNfcAdapter.java)（旧 Android 栈，非 HarmonyOS NEXT）
 
+## 0.7.3：realme 与共用接口选择
+
+通用策略依赖系统实际暴露的接口，不依赖品牌或型号白名单：
+
+1. 在旧平台 `NfcAdapter` 和每个可信 ROM 库中，分别寻找参数、返回类型完整的身份设置／读取／功能接口。过去第一处同名类不完整会遮住后续库；现在逐个核查，去重同一已加载类。
+2. 点击启用后只读连接候选，检查功能及当前停用状态。首个客户端无服务、拒绝访问或无法读到受支持状态时，在写入前检查下一候选。仍要求MODE明确为0，保留全空初始状态与部分缺失的区别。不写未知模式，不申请虚构权限。
+3. 选中后仍执行原加密备份、写前复查、准备写入标记、设置与回读。设置失败走原接口恢复，**绝不通过切换候选继续试写**。
+4. 新恢复资料schema2保存接口来源，验证／停用只连接该接口，消失或失效时保留资料。schema1保持0.7.2的默认接口顺序。新资料不支持旧版客户端解析；有活动模拟或待恢复资料时，不应降级旧版。
+5. 只读兼容性报告逐候选列出连接／功能／字段状态，正常启用自动完成同样的必要预检。没有自动上传、读取卡号日志或新增工程弹窗。
+
+GT Neo 2 官方发布规格为Android11，旧APK要求Android12，缺少必要性；此版将minSdk31降至30，现有运行API经lint检查。**允许Android11安装不代表其私有NFC接口可用**。[realme官方规格](https://www.realme.com/global/realme-gt-neo-2/specs)
+
+另外检查公开的realme X3 Android11系统提取物，仅作历史接口样本，不冒充RMX3370当前ROM：
+
+- [系统提取仓库，固定提交 b9c6c19](https://github.com/adithya2306/realme_x3_dump/tree/b9c6c195cc73adcb801fad17b8ed9f16e8c7b434)。`system/system/build.prop`为SDK30／Android11；`system_ext/etc/permissions/nfcvendorlib.xml`注册`/system_ext/framework/nfcvendorlib.jar`，与已有可信加载路径一致。
+- 对客户端JAR与NfcNci.apk的DEX检查中，该客户端有`getVendorNfcAdapter`、`hasFeature`和监听方法，没有`setHceTypeAConfig`、`getHceTypeAUid`。这说明存在“有欧加类但无此身份接口”的旧栈，不能用任意Binder编号补猜方法，也不能据此断言RMX3370没有其他实现。
+- JAR SHA256：`6f403f397c2391e31a9aca1a07d6a38a88e00f274c965ed632c46a15991e8ecd`；APK SHA256：`da27a35065206f92d58b7c076fd6c783d46430055240b6bfaa31bf87c9b93ebc`。只在gitignored研究目录分析，未执行这些文件、未复制其代码、未打包进APK。该提取物不是厂商公开SDK合约。
+
+本轮还复查已保存的NXP配置／路由、三星附件、华为路由接口，未得到可核实的任意UID设置与恢复合约。三星当前Wallet NFC文档仍要求合作接入和批准，不是可直接代用的本地复制接口。[三星NFC接入](https://developer.samsung.com/wallet/addtosamsungwallet/nfccapabilities.html)
+
+其他品牌在上表列明各自缺项，不以手机有NFC或系统钱包能录卡冒充本App已适配。若具体ROM暴露已实现的ST或欧加合约，可通过同一能力检查；仅公共HCE不能替代固定UID功能。[Android HCE](https://developer.android.com/develop/connectivity/nfc/hce)
+
 ## 本轮验证
 
-Debug／Release各62项JVM测试，新增8项初始状态边界与停用恢复测试；仍覆盖备份和写入先后、崩溃、部分生效、错误回读、外部变更、存储／服务失败。它们验证客户端协议，不证明厂商实现与假设相符。lint 0 errors / 16 warnings，签名延续旧版。用户已成功复制CPH2653的只读结果；新版厂商设置／恢复、RF、熄屏、支付均 **NOT RUN**。
+Debug／Release各70项JVM测试；本版新增8项候选预检、空／活动／部分状态拒绝、恢复接口绑定、旧schema兼容与禁止写后换接口测试。仍覆盖初始状态、备份与写入先后、崩溃、部分生效、错误回读、外部变更、存储／服务失败。测试验证客户端协议，不证明厂商实现与假设相符。lint 0 errors / 16 warnings，签名延续旧版。用户反馈0.7.2一加可用；本版realme、OnePlus／Redmi回归、RF、熄屏、恢复、支付均 **NOT RUN**。
 
 ## 无调试连接的排查
 

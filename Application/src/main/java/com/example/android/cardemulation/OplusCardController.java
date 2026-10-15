@@ -19,11 +19,26 @@ final class OplusCardController {
                 .put("recoveryPending", state.exists(ROLLBACK));
         NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
         if (nfc == null || !nfc.isEnabled()) return report.put("status", nfc == null ? "NFC_UNAVAILABLE" : "NFC_OFF");
-        if (VendorLibraries.oplusApi() == null) return report.put("status", "API_UNAVAILABLE");
+        java.util.List<OplusConnection.Endpoint> endpoints = VendorLibraries.oplusEndpoints();
+        if (endpoints.isEmpty()) return report.put("status", "API_UNAVAILABLE");
+        org.json.JSONArray candidates = new org.json.JSONArray();
+        for (OplusConnection.Endpoint endpoint : endpoints) {
+            JSONObject candidate = new JSONObject().put("endpoint", endpoint.id);
+            try { describe(OplusConnection.open(endpoint, nfc, this::setting), candidate); }
+            catch (Exception | LinkageError error) {
+                candidate.put("status", "CONNECT_FAILED").put("errorType", VendorFailure.at("OPLUS_CONNECT", error).errorType());
+            }
+            candidates.put(candidate);
+        }
+        report.put("candidates", candidates).put("status", "READ_ONLY_CHECK_COMPLETE");
+        try { report.put("usableInactiveEndpoint", selectInactive().endpoint.id); }
+        catch (Exception | LinkageError error) { report.put("preflightFailure", VendorFailure.at("OPLUS_PREFLIGHT", error).code); }
+        return report;
+    }
+    private void describe(OplusConnection connection, JSONObject report) throws Exception {
         try {
-            Connection connection = new Connection();
-            report.put("api", connection.api == NfcAdapter.class ? "PLATFORM" : "VENDOR_LIBRARY");
-            try { report.put("featureEnabled", connection.api.getMethod("hasFeature", String.class).invoke(connection.adapter, "HCE_ACCESSCARD")); }
+            report.put("api", connection.endpoint.api == NfcAdapter.class ? "PLATFORM" : "VENDOR_LIBRARY");
+            try { report.put("featureEnabled", connection.featureEnabled()); }
             catch (Exception | LinkageError error) { report.put("featureReadError", VendorFailure.at("OPLUS_FEATURE", error).errorType()); }
             JSONObject fields = new JSONObject();
             java.util.EnumMap<OplusStateFormat.Field, String> rawFields = new java.util.EnumMap<>(OplusStateFormat.Field.class);
@@ -32,8 +47,7 @@ final class OplusCardController {
                 try {
                     String raw;
                     if (field == OplusStateFormat.Field.REPORTED_UID) {
-                        Object value = connection.api.getMethod("getHceTypeAUid").invoke(connection.adapter);
-                        raw = value instanceof String ? (String) value : null;
+                        raw = connection.reportedUid();
                     } else raw = connection.setting(field.name().toLowerCase(java.util.Locale.ROOT));
                     item.put("status", OplusStateFormat.status(field, raw)).put("characters", raw == null ? 0 : Math.min(raw.length(), 129));
                     rawFields.put(field, raw);
@@ -55,29 +69,29 @@ final class OplusCardController {
                     && "VALID".equals(OplusStateFormat.status(OplusStateFormat.Field.REPORTED_UID, reportedUid)))
                 report.put("uidStatesMatch", OplusStateFormat.parse(OplusStateFormat.Field.UID, storedUid)
                         .equals(OplusStateFormat.parse(OplusStateFormat.Field.REPORTED_UID, reportedUid)));
-            return report.put("status", "READ_ONLY_CHECK_COMPLETE").put("fields", fields);
+            report.put("status", "READ_ONLY_CHECK_COMPLETE").put("fields", fields);
         } catch (Exception | LinkageError error) {
-            return report.put("status", "CONNECT_FAILED").put("errorType", VendorFailure.at("OPLUS_CONNECT", error).errorType());
+            report.put("status", "READ_FAILED").put("errorType", VendorFailure.at("OPLUS_READ", error).errorType());
         }
     }
 
     JSONObject enable(AccessCardProfile profile) throws Exception {
         try {
-            Connection connection = new Connection();
-            if (!Boolean.TRUE.equals(connection.api.getMethod("hasFeature", String.class).invoke(connection.adapter, "HCE_ACCESSCARD")))
-                throw new VendorFailure("OPLUS_FEATURE", "OPLUS_FEATURE_UNAVAILABLE", null);
+            if (state.exists(ROLLBACK)) restore();
+            OplusConnection connection = selectInactive();
             boolean fromEmpty = transaction(connection).enable(profile);
-            return report("ENABLE_TEST").put("startedWithoutVendorIdentity", fromEmpty).put("uidByteLength", profile.uid.length).put("uidMatched", true)
+            return report("ENABLE_TEST").put("endpoint", connection.endpoint.id).put("startedWithoutVendorIdentity", fromEmpty).put("uidByteLength", profile.uid.length).put("uidMatched", true)
                     .put("classicAuthentication", "NOT_IMPLEMENTED");
         } catch (Exception | LinkageError error) { throw VendorFailure.at("OPLUS_ENABLE", error); }
     }
     JSONObject verify(AccessCardProfile profile) throws Exception {
-        try { transaction(new Connection()).verify(profile); return report("VERIFY_ACTIVE"); }
+        try { transaction(recoveryConnection()).verify(profile); return report("VERIFY_ACTIVE"); }
         catch (Exception | LinkageError error) { throw VendorFailure.at("OPLUS_VERIFY", error); }
     }
     JSONObject restore() throws Exception {
         try {
-            transaction(new Connection()).restore();
+            if (!state.exists(ROLLBACK)) return report("RESTORE").put("result", "NO_ACTIVE_TEST");
+            transaction(recoveryConnection()).restore();
             return report("RESTORE").put("restoreScope", "DISABLED_OVERRIDE_AND_CHECKED_VENDOR_STATE")
                     .put("controllerBytesRestored", false).put("routesWritten", false);
         } catch (Exception | LinkageError error) { throw VendorFailure.at("OPLUS_RESTORE", error); }
@@ -88,33 +102,25 @@ final class OplusCardController {
                 .put("controllerReadback", "NOT_AVAILABLE").put("uidLogged", false)
                 .put("doorUnlockStatus", "NOT_TESTED").put("screenOffRfStatus", "NOT_TESTED");
     }
-    private final class Connection implements OplusTransaction.Port {
-        final Class<?> api;
-        final Object adapter;
-        Connection() throws Exception {
-            api = VendorLibraries.oplusApi();
-            if (api == null) throw new VendorFailure("OPLUS_CONNECT", "VENDOR_INTERFACE_UNAVAILABLE", null);
-            adapter = api == NfcAdapter.class ? NfcAdapter.getDefaultAdapter(context)
-                    : VendorLibraries.find(VendorCapabilities.OPLUS).getMethod("getVendorNfcAdapter").invoke(null);
-            if (adapter == null) throw new VendorFailure("OPLUS_CONNECT", "SERVICE_UNAVAILABLE", null);
-        }
-        @Override public OplusTransaction.State read() throws Exception {
-            Object uid = api.getMethod("getHceTypeAUid").invoke(adapter);
-            return new OplusTransaction.State(setting("mode"), setting("atqa"), setting("sak"), setting("uid"),
-                    uid instanceof String ? (String) uid : null);
-        }
-        private String setting(String suffix) { return Settings.Global.getString(context.getContentResolver(), "hce_access_card_" + suffix); }
-        @Override public boolean set(boolean enabled, byte[] atqa, byte[] sak, byte[] uid) throws Exception {
-            return Boolean.TRUE.equals(api.getMethod("setHceTypeAConfig", boolean.class, byte[].class, byte[].class, byte[].class)
-                    .invoke(adapter, enabled, atqa, sak, uid));
-        }
+    private String setting(String suffix) { return Settings.Global.getString(context.getContentResolver(), "hce_access_card_" + suffix); }
+    private OplusConnection selectInactive() throws Exception {
+        return OplusConnection.select(VendorLibraries.oplusEndpoints(), NfcAdapter.getDefaultAdapter(context), this::setting, "", true);
     }
-    private OplusTransaction transaction(Connection connection) {
+    private String savedEndpoint(JSONObject saved) throws Exception {
+        java.util.List<OplusConnection.Endpoint> endpoints = VendorLibraries.oplusEndpoints();
+        return OplusConnection.recoveryEndpoint(saved.getInt("schema"), saved.optString("endpoint"),
+                endpoints.isEmpty() ? "" : endpoints.get(0).id);
+    }
+    private OplusConnection recoveryConnection() throws Exception {
+        JSONObject saved = new JSONObject(new String(state.read(ROLLBACK), StandardCharsets.UTF_8));
+        return OplusConnection.select(VendorLibraries.oplusEndpoints(), NfcAdapter.getDefaultAdapter(context), this::setting, savedEndpoint(saved), false);
+    }
+    private OplusTransaction transaction(OplusConnection connection) {
         return new OplusTransaction(connection, new OplusTransaction.Recovery() {
             @Override public OplusTransaction.Snapshot load() throws Exception {
                 if (!state.exists(ROLLBACK)) return null;
                 JSONObject saved = new JSONObject(new String(state.read(ROLLBACK), StandardCharsets.UTF_8));
-                if (saved.getInt("schema") != 1 || !"OPLUS_DIRECT".equals(saved.getString("backend")))
+                if (!"OPLUS_DIRECT".equals(saved.getString("backend")) || !connection.endpoint.id.equals(savedEndpoint(saved)))
                     throw new VendorFailure("OPLUS_RECOVERY", "OPLUS_STATE_UNREADABLE", null);
                 JSONObject before = saved.getJSONObject("before");
                 JSONObject requested = saved.getJSONObject("requested");
@@ -126,7 +132,7 @@ final class OplusCardController {
             @Override public void save(OplusTransaction.Snapshot snapshot) throws Exception {
                 OplusTransaction.State before = snapshot.before;
                 AccessCardProfile profile = snapshot.requested;
-                JSONObject json = new JSONObject().put("schema", 1).put("backend", "OPLUS_DIRECT").put("attempted", snapshot.attempted)
+                JSONObject json = new JSONObject().put("schema", 2).put("backend", "OPLUS_DIRECT").put("endpoint", connection.endpoint.id).put("attempted", snapshot.attempted)
                         .put("before", new JSONObject().put("mode", before.mode).put("atqa", before.atqa).put("sak", before.sak)
                                 .put("uid", before.uid).put("reportedUid", before.reportedUid))
                         .put("requested", new JSONObject().put("uid", OplusTransaction.hex(profile.uid))

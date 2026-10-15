@@ -18,25 +18,25 @@ final class VendorLibraries {
         "/system_ext/framework/com.vendor.nfc.jar"
     };
     private static final class Libraries {
-        static final List<ClassLoader> LOADERS = loaders();
-        private static List<ClassLoader> loaders() {
-            List<ClassLoader> result = new ArrayList<>();
+        static final java.util.Map<String, ClassLoader> LOADERS = loaders();
+        private static java.util.Map<String, ClassLoader> loaders() {
+            java.util.Map<String, ClassLoader> result = new java.util.LinkedHashMap<>();
             ClassLoader parent = VendorLibraries.class.getClassLoader();
-            result.add(parent);
+            result.put("SHARED", parent);
             for (String path : PATHS) {
                 try {
                     File file = new File(path);
                     String canonical = file.getCanonicalPath();
                     if (file.isFile() && file.canRead() && !file.canWrite()
                             && (canonical.startsWith("/system_ext/") || canonical.startsWith("/system/system_ext/")))
-                        result.add(new PathClassLoader(canonical, parent));
+                        result.put(path, new PathClassLoader(canonical, parent));
                 } catch (java.io.IOException | SecurityException | LinkageError unavailable) { /* Continue with installed libraries. */ }
             }
             return result;
         }
     }
     static Class<?> find(String name) {
-        for (ClassLoader loader : Libraries.LOADERS) {
+        for (ClassLoader loader : Libraries.LOADERS.values()) {
             Class<?> type = find(name, loader);
             if (type != null) return type;
         }
@@ -47,7 +47,7 @@ final class VendorLibraries {
         catch (ClassNotFoundException | SecurityException | LinkageError unavailable) { return null; }
     }
     static Class<?> stClass() {
-        for (ClassLoader loader : Libraries.LOADERS) {
+        for (ClassLoader loader : Libraries.LOADERS.values()) {
             Class<?> type = find(VendorInterface.CLASS_NAME, loader);
             if (VendorInterface.compatible(type) && VendorCapabilities.stRoutes(find(ST_SETTINGS, type.getClassLoader()), Context.class))
                 return type;
@@ -55,8 +55,22 @@ final class VendorLibraries {
         return null;
     }
     static Class<?> oplusApi() {
-        if (VendorCapabilities.oplusIdentityApi(NfcAdapter.class)) return NfcAdapter.class;
-        return VendorCapabilities.oplusFactoryApi(find(VendorCapabilities.OPLUS));
+        List<OplusConnection.Endpoint> endpoints = oplusEndpoints();
+        return endpoints.isEmpty() ? null : endpoints.get(0).api;
+    }
+    static List<OplusConnection.Endpoint> oplusEndpoints() {
+        List<OplusConnection.Endpoint> result = new ArrayList<>();
+        if (VendorCapabilities.oplusIdentityApi(NfcAdapter.class))
+            result.add(new OplusConnection.Endpoint("PLATFORM", NfcAdapter.class, null));
+        java.util.Set<Class<?>> seen = new java.util.HashSet<>();
+        for (java.util.Map.Entry<String, ClassLoader> source : Libraries.LOADERS.entrySet()) {
+            Class<?> factory = find(VendorCapabilities.OPLUS, source.getValue());
+            Class<?> api = VendorCapabilities.oplusFactoryApi(factory);
+            if (api == null || !seen.add(factory)) continue;
+            try { result.add(new OplusConnection.Endpoint("ROM:" + source.getKey(), api, factory.getMethod("getVendorNfcAdapter"))); }
+            catch (ReflectiveOperationException | SecurityException | LinkageError unavailable) { /* Try the next installed client. */ }
+        }
+        return result;
     }
     static String unavailableCode() {
         boolean st = stClass() != null;
@@ -66,6 +80,7 @@ final class VendorLibraries {
         return new JSONObject().put("selectedBackendCandidate", VendorCardController.useOplus(context) ? "OPLUS_DIRECT_EXPERIMENTAL"
                         : stClass() != null ? "ST" : "NONE")
                 .put("activeChipVerified", false)
+                .put("oplusCandidateCount", oplusEndpoints().size())
                 .put("st", new JSONObject().put("classPresent", find(VendorInterface.CLASS_NAME) != null)
                         .put("requiredMethodsPresent", stClass() != null).put("runtimeBaselineCheckRequired", true))
                 .put("oplus", new JSONObject().put("classPresent", find(VendorCapabilities.OPLUS) != null)
@@ -84,14 +99,13 @@ final class VendorLibraries {
     static JSONObject readOplusUidStatus(Context context) {
         JSONObject result = new JSONObject();
         try {
-            Class<?> api = oplusApi();
-            if (api == null) return result.put("status", "API_UNAVAILABLE");
+            List<OplusConnection.Endpoint> endpoints = oplusEndpoints();
+            if (endpoints.isEmpty()) return result.put("status", "API_UNAVAILABLE");
             NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
             if (nfc == null || !nfc.isEnabled()) return result.put("status", "NFC_UNAVAILABLE_OR_OFF");
-            Object adapter = api == NfcAdapter.class ? nfc
-                    : find(VendorCapabilities.OPLUS).getMethod("getVendorNfcAdapter").invoke(null);
-            if (adapter == null) return result.put("status", "SERVICE_UNAVAILABLE");
-            Object uid = api.getMethod("getHceTypeAUid").invoke(adapter);
+            OplusConnection connection = OplusConnection.select(endpoints, nfc,
+                    suffix -> android.provider.Settings.Global.getString(context.getContentResolver(), "hce_access_card_" + suffix), "", false);
+            Object uid = connection.reportedUid();
             // No identity bytes or arbitrary vendor strings may enter the diagnostic report.
             String value = uid instanceof String ? (String) uid : "";
             boolean valid = "VALID".equals(OplusStateFormat.status(OplusStateFormat.Field.REPORTED_UID, value));

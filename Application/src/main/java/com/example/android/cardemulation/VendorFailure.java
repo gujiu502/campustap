@@ -42,6 +42,7 @@ final class VendorFailure extends Exception {
             case "OPLUS_ENABLE_MISMATCH": return "卡片設定回讀不一致，已嘗試恢復原狀態。";
             case "OPLUS_RESTORE_REJECTED": return "系統未接受恢復操作，已保留復原資料。";
             case "OPLUS_STATE_CHANGED": return "NFC 狀態已由其他操作變更，已保留復原資料，未覆蓋目前卡片。";
+            case "OPLUS_RECOVERY_INTERFACE_UNAVAILABLE": return "原先啟用卡片的系統介面目前無法連線，已保留復原資料，未改用其他介面寫入。";
             case "RECOVERY_BACKEND_CONFLICT": return "存在多組待恢復資料，已停止設定並保留資料。";
             case "PROFILE_REQUIRED": return "請先感應本人學生證，錄入門卡參數";
             case "NO_NCI_READBACK": return "系統未回傳此 NFC 參數，不能安全設定";
