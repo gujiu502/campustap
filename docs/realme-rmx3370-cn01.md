@@ -35,4 +35,32 @@ system_ext压缩条目867421518字节，CRC32为3098086273；Brotli结束标志�
 - 旧欧加只读报告独立读取功能开关、白名单芯片标签及两个运行时布尔属性。属性读取采用固定`/system/bin/getprop`与两个固定键，每次有超时；空值或失败为UNKNOWN类状态，不冒充false，不修改任何属性或地区设置。
 - ST候选未授权时标为`ST_PERMISSION_REQUIRED`，不再只显示ST。
 
-这次报告没有ST真实服务／权限、OEM芯片标签与运行时模式值。更新后的报告用于补齐它们；真实启用、门禁、熄屏与恢复仍NOT RUN。0.7.5是诊断改进，**没有新增已验证的RMX3370模拟后端**。正常UI不新增工程弹窗，不使用Root／ADB／辅助App，不切换付款钱包。
+发布时的报告没有ST真实服务／权限、OEM芯片标签与运行时模式值。下节记录用户随后提供的结果。0.7.5是诊断改进，**没有新增已验证的RMX3370模拟后端**。正常UI不新增工程弹窗，不使用Root／ADB／辅助App，不切换付款钱包。
+
+## 0.7.5 用户实机回报与 NXP 复核
+
+2026-10-15，用户从上述同一型号／系统复制报告；本轮没有调试连接。以下是用户报告的观测，不是维护者另行完成的RF测试：
+
+| 项目 | 报告结果 | 可得结论 |
+|---|---|---|
+| 基本NFC权限 | `GRANTED` | 不能再把失败归因为忘记申请基本权限 |
+| 系统设置权限 | `DENIED` | 未取得ST路径所需权限；普通权限弹窗不能授予此权限 |
+| OEM芯片报告 | `SN100T` | 对应NXP系列，支持改查NXP路径；仍不是RF或硬件独立验证 |
+| ST服务连接 | `CONNECT_ST_SERVICE / CALL_FAILED / RuntimeException` | ST客户端类和方法存在，但实际连接失败；错误未包含具体服务原因，不能仅由异常类型断言服务不存在或只缺权限 |
+| 旧欧加接口 | setter与feature匹配，UID getter缺失／被过滤 | 与同版ROM缺少getter的静态事实吻合，当前完整后端不适用 |
+| 旧欧加功能查询 | `featureEnabled=false` | 客户端回报功能不可用；不能仅据此区分地区、属性、RUS开关或客户端失败回退 |
+| 两个属性 | `EMPTY_OR_INACCESSIBLE` | 未知，不当成false，也不能据此宣布手机的地区属性值 |
+| 本次探测 | `mutationAttempted=false / recoveryPending=false` | 报告未尝试写入，无待恢复记录；不是模拟成功证明 |
+
+`SN100T`与NXP的关系参见[NXP官方产品说明](https://www.nxp.com/company/about-nxp/smarter-world-blog/BL-MORE-100-CHINESE-CITIES)。[Android权限文档](https://developer.android.com/reference/android/Manifest.permission#WRITE_SECURE_SETTINGS)将`WRITE_SECURE_SETTINGS`标为不供第三方应用使用；它不是可用普通运行时弹窗授予的危险权限。
+
+继续读取同版ROM中先前保留的NFC文件，并从同一个system_ext镜像仅提取`lib64/libsn100nfc_nci.so`（2533280字节，SHA256 `66291c22b63068a0ebd2a6068613e8488c0315b9f98d7eee0581c862cbc013b7`）。本地用pyelftools 0.32与Capstone 5.0.6作静态检查，未加载或执行该库：
+
+1. 服务端`VendorNfcService.doHasFeature`确实识别`HCE_ACCESSCARD`，不是应用拼错查询名。它结合`colorOsIsSupportHceAccessCard()`与NfcFeature的启用状态返回结果；旧客户端还会将部分RemoteException失败转为false。因此报告不能提供更细的关闭原因。
+2. NXP的`setConfig(String,String)`与`changeRfParamsByConfig(byte[])`先检查`checkPackageAccess()`；不在可访问名单时调用`NfcPermissions.enforceAdminPermissions`，该ROM实际检查`WRITE_SECURE_SETTINGS`。`setConfig`还操作`/data/nfc/libnfc-nxpTransit.conf`，不是任意App可直接使用的普通文件设置。
+3. 另一个`changeRfParams(byte[],boolean)`服务方法只检查基本NFC权限，并转到native。ELF中的JNI登记确认签名`([BZ)I`，函数地址`0x89790`、unwind范围1524字节。原生正常发送分支要求命令头`20 02`（设置配置），调用`NxpNfc_Write_Cmd_Common`；Java层只收到整数结果码。此路径不是可直接借用的原配置查询接口。布尔参数为true的成功分支还调用`send_flush_ram_to_flash`，所以不能用猜测参数反复试写。
+4. `startCardEmulation()`没有UID／ATQA／SAK参数；reader pass-through和`transceiveAppData`是另一组读卡器调用，不能因方法名称相近就当作卡片身份设置／原配置回读。
+
+在已检查的客户端／服务合约中，仍未找到与上述NXP写入配套、普通App可用且可验证的原身份／配置读取和恢复流程。**这不是证明该硬件绝无其他路径；这是当前不能交付可靠NXP模拟后端的具体缺项。** 不能拿原生库中的内部`getConfig`函数冒充已经暴露给APK的服务接口，也不能把硬编码默认值冒充原配置备份。
+
+本轮不新增猜测写入、不改属性／地区／付款配置，APK维持0.7.5。源码核查和用户报告已经足以说明：ST授权不是唯一阻塞，删掉getter检查也不能证明可用。不要求用户再安装同类定位版重复提供相同信息。真实门禁、熄屏、控制器回读与恢复仍NOT RUN。

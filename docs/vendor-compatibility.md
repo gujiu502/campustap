@@ -14,7 +14,7 @@ Android 公共 HCE 面向 ISO-DEP/APDU；没有设置任意固定 NFC-A UID 的�
 |---|---|---|
 | Xiaomi／Redmi／POCO | ST 后端不再限型号；增加库来源发现与路由接口完整性检查 | 既有 Redmi 用户反馈可用；其他机器须通过方法、WSS、91字节布局与基线检查，不承诺全系列 |
 | OPPO | 新增直接调用设置、厂商状态回读与停用恢复 | 实验性；须通过方法、功能开关、完整停用状态及回读检查；实机 NOT RUN [欧加研究] |
-| Realme | RMX3370同版Android13官方ROM：存在setter及feature，缺少UID getter；服务还检查海外与功能属性。新增分项诊断 | 当前完整接口检查会拒绝该旧栈；尚未实现旧合约写入。实际属性／ST服务／RF仍 NOT RUN。[同版ROM核查](realme-rmx3370-cn01.md) |
+| Realme | RMX3370同版Android13官方ROM：存在setter及feature，缺少UID getter；用户0.7.5回报OEM芯片SN100T、feature=false、ST连接失败 | NXP替代写入方法已静态核查，但未找到配套的原配置回读／恢复合约，尚未完成模拟适配。属性值未知，RF仍 NOT RUN。[同版ROM核查](realme-rmx3370-cn01.md) |
 | OnePlus | 保留明确MODE0且全空的初始状态处理；增加候选预检与恢复接口绑定 | 用户已反馈0.7.2可用；0.7.3回归、完整恢复与熄屏尚未实测 [欧加研究] |
 | Samsung | 识别 SamsungNfcAdapter；核对公开 Wallet NFC 接入与已分析的附件接口 | 附件通信不是固定 UID 后端；Wallet 要求接入配置，未接入 [三星] |
 | Huawei | 识别 HwNfcAdapter；核对 Wallet Kit 及旧 Android 扩展路由接口 | 路由选择不是任意 UID 设置；Wallet 为商户凭证接入，未接入 [华为] |
