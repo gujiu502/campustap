@@ -6,11 +6,11 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class RadioConfigurationTest {
-    @Test public void deviceAndRomMustBothMatchBeforeControllerAccess() {
-        assertTrue(RadioConfiguration.verifiedDevice("24115RA8EG", "OS2.0.2.0.VOPMIXM"));
-        assertFalse(RadioConfiguration.verifiedDevice("other-phone", "OS2.0.2.0.VOPMIXM"));
-        assertFalse(RadioConfiguration.verifiedDevice("24115RA8EG", "unknown-rom"));
-        assertFalse(RadioConfiguration.verifiedDevice(null, null));
+    @Test public void rejectsUnknownControllerLayoutsEvenWhenIdentityFieldsMatch() {
+        for (int size : new int[]{82, 90, 92, 128}) {
+            byte[] controller = new byte[size]; controller[26] = 32;
+            assertThrows(VendorFailure.class, () -> RadioConfiguration.requireBaseline(controller, parameters()));
+        }
     }
     private byte[] baseline() { byte[] bytes = new byte[91]; bytes[26] = 32; return bytes; }
     private Map<Integer, byte[]> parameters() {

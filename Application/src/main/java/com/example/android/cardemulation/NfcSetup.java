@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.nfc.NfcAdapter;
-import android.os.Build;
 import android.provider.Settings;
 import android.widget.Toast;
 
@@ -20,8 +19,8 @@ final class NfcSetup {
     static boolean hasAuthorization(Context context) { return authorizationFailure(context) == null; }
     static String summary(Activity activity) {
         NfcAdapter nfc = NfcAdapter.getDefaultAdapter(activity);
-        String simulation = !RadioConfiguration.verifiedDevice(Build.MODEL, Build.VERSION.INCREMENTAL) ? "此裝置尚未支援"
-                : VendorCardController.hasSystemPermission(activity) ? "系統授權已就緒" : "未取得系統授權";
+        String simulation = !VendorCardController.hasVendorInterface() ? "系統未提供相容介面"
+                : VendorCardController.hasSystemPermission(activity) ? "可嘗試啟用" : "未取得系統授權";
         return "NFC：" + (nfc == null ? "不支援" : nfc.isEnabled() ? "已開啟" : "未開啟") + "\n卡片模擬：" + simulation;
     }
     static void openSettings(Activity activity) {

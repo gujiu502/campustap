@@ -7,8 +7,8 @@ android {
         applicationId 'tw.campustap.diagnostics'
         minSdk 31
         targetSdk 35
-        versionCode 11
-        versionName '0.6.3-permission-ui-fix'
+        versionCode 12
+        versionName '0.6.4-interface-detection'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

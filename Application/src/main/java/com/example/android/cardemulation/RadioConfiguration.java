@@ -4,11 +4,11 @@ import java.util.Arrays;
 import java.util.Map;
 
 final class RadioConfiguration {
-    static final String MODEL = "24115RA8EG", ROM = "OS2.0.2.0.VOPMIXM";
-    static boolean verifiedDevice(String model, String rom) { return MODEL.equals(model) && ROM.equals(rom); }
+    // These offsets describe the calibrated 91-byte ST configuration block.
+    private static final int CONTROLLER_BYTES = 91;
     static final int[] PARAMETERS = {0x30, 0x31, 0x32, 0x33, 0x58, 0x59};
     static void requireBaseline(byte[] controller, Map<Integer, byte[]> nci) throws VendorFailure {
-        if (controller == null || controller.length < 82 || controller[20] != 0 || controller[26] != 32)
+        if (controller == null || controller.length != CONTROLLER_BYTES || controller[20] != 0 || controller[26] != 32)
             throw new VendorFailure("CHECK_BASELINE", "CONTROLLER_BASELINE_MISMATCH", null);
         for (int id : PARAMETERS) {
             byte[] expected = id == 0x30 ? new byte[]{4} : id == 0x31 ? new byte[]{0}
@@ -27,7 +27,7 @@ final class RadioConfiguration {
         return id == 0x33 && dynamicUid(before) ? dynamicUid(after) : Arrays.equals(before, after);
     }
     static void requireEnabled(byte[] controller, Map<Integer, byte[]> nci, AccessCardProfile profile) throws VendorFailure {
-        if (controller == null || controller.length < 82 || controller[20] != 4 || controller[26] != profile.sak
+        if (controller == null || controller.length != CONTROLLER_BYTES || controller[20] != 4 || controller[26] != profile.sak
                 || !Arrays.equals(Arrays.copyOfRange(controller, 72, 76), profile.uid)
                 || !Arrays.equals(nci.get(0x33), profile.uid)
                 || !Arrays.equals(nci.get(0x30), new byte[]{profile.atqa[0]})

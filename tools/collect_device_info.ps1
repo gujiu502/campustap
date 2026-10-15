@@ -11,7 +11,6 @@ function Read-Adb([string[]]$DeviceArgs) {
     return ($result -join "`n").Trim()
 }
 $model = Read-Adb @('shell','getprop','ro.product.model')
-if ($model -ne '24115RA8EG') { throw 'Selected device is not the verified Redmi model.' }
 $features = Read-Adb @('shell','pm','list','features')
 $packages = Read-Adb @('shell','pm','list','packages')
 $nfc = Read-Adb @('shell','dumpsys','nfc')

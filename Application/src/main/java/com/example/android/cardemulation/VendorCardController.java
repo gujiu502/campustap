@@ -3,14 +3,13 @@ package com.example.android.cardemulation;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.nfc.NfcAdapter;
-import android.os.Build;
 import android.util.Base64;
 import org.json.JSONObject;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
-/** Device-specific card selection; no Classic authentication or payment implementation. */
+/** Capability-checked OEM card selection; no Classic authentication or payment implementation. */
 final class VendorCardController {
     private static final String ROLLBACK = "radio_rollback.enc";
     static final java.util.concurrent.ExecutorService WORKER = java.util.concurrent.Executors.newSingleThreadExecutor();
@@ -155,8 +154,7 @@ final class VendorCardController {
         if (failure != null) throw failure;
     }
     static VendorFailure readinessFailure(Context context) {
-        if (!RadioConfiguration.verifiedDevice(Build.MODEL, Build.VERSION.INCREMENTAL))
-            return new VendorFailure("CHECK_DEVICE", "UNVERIFIED_DEVICE", null);
+        if (!hasVendorInterface()) return new VendorFailure("CHECK_INTERFACE", "VENDOR_INTERFACE_UNAVAILABLE", null);
         VendorFailure authorization = NfcSetup.authorizationFailure(context);
         if (authorization != null) return authorization;
         NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
@@ -166,7 +164,11 @@ final class VendorCardController {
     static boolean hasSystemPermission(Context context) {
         return context.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == PackageManager.PERMISSION_GRANTED;
     }
-    private Object adapter() throws Exception { return Class.forName("com.st.android.nfc_extensions.NfcAdapterStExtensions").getConstructor().newInstance(); }
+    static boolean hasVendorInterface() {
+        try { return VendorInterface.compatible(Class.forName(VendorInterface.CLASS_NAME, false, VendorCardController.class.getClassLoader())); }
+        catch (ClassNotFoundException | SecurityException | LinkageError unavailable) { return false; }
+    }
+    private Object adapter() throws Exception { return Class.forName(VendorInterface.CLASS_NAME).getConstructor().newInstance(); }
     private byte[] controller(Object adapter) throws Exception {
         try {
             Object value = adapter.getClass().getMethod("sendPropGetConfig", int.class, int.class).invoke(adapter, 4, 0);

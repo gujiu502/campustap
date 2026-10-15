@@ -15,12 +15,12 @@ public class VendorFailureTest {
     }
     @Test public void distinguishesPermissionFromUnsupportedDevicesAndNfcOff() {
         VendorFailure permission = new VendorFailure("CHECK_PERMISSION", "PERMISSION_REQUIRED", null);
-        VendorFailure device = new VendorFailure("CHECK_DEVICE", "UNVERIFIED_DEVICE", null);
+        VendorFailure device = new VendorFailure("CHECK_INTERFACE", "VENDOR_INTERFACE_UNAVAILABLE", null);
         VendorFailure off = new VendorFailure("CHECK_NFC", "NFC_OFF", null);
         assertTrue(permission.needsAuthorization());
         assertTrue(permission.description().contains("無法在 App 內直接取得"));
         assertFalse(device.needsAuthorization());
-        assertTrue(device.description().contains("裝置適配"));
+        assertTrue(device.description().contains("介面"));
         assertFalse(off.needsAuthorization());
         assertTrue(off.description().contains("開啟 NFC"));
         assertFalse(new VendorFailure("CHECK_NFC", "NFC_UNAVAILABLE", null).needsAuthorization());
