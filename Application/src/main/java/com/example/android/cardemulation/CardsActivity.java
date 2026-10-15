@@ -167,7 +167,9 @@ public final class CardsActivity extends Activity {
             final String target = keys[i];
             LinearLayout item = column(); item.setGravity(Gravity.CENTER); item.setMinimumHeight(dp(64));
             int color = page.equals(target) ? BLUE : MUTED;
-            item.addView(label(symbols[i], 26, color, false)); item.addView(label(titles[i], 12, color, page.equals(target)));
+            TextView glyph = label(symbols[i], 26, color, false); glyph.setGravity(Gravity.CENTER);
+            TextView caption = label(titles[i], 12, color, page.equals(target)); caption.setGravity(Gravity.CENTER);
+            item.addView(glyph); item.addView(caption);
             item.setBackground(ripple(Color.WHITE, 12)); item.setContentDescription(titles[i]); item.setOnClickListener(v -> showPage(target));
             nav.addView(item, new LinearLayout.LayoutParams(0, -2, 1));
         }

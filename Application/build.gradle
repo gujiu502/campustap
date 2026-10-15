@@ -7,8 +7,8 @@ android {
         applicationId 'tw.campustap.diagnostics'
         minSdk 30
         targetSdk 35
-        versionCode 17
-        versionName '0.7.3-interface-selection'
+        versionCode 18
+        versionName '0.7.4-centered-navigation'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

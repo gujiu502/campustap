@@ -1,6 +1,6 @@
 # CampusTap — 多卡片 NFC 门禁参数管理
 
-2026-10-15，版本 `0.7.3-interface-selection`。用户已反馈 0.7.2 在一加可用；这是用户实测反馈，不扩大为所有一加机型或完整恢复验证。此版面向 realme／OPPO／OnePlus 共用接口，修复“首个类存在就挡住其他接口”的选择问题：点击启用时自动逐个做只读预检，通过后才备份并设置，不要求先复制诊断。恢复绑定实际使用的接口，不连续试写。**GT Neo 2 / RMX3370 尚未实测，不能宣称已经修好。** 见 [逐品牌兼容性与 realme 核查](docs/vendor-compatibility.md)。原 Redmi 可用为用户反馈；既有证据见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
+2026-10-15，版本 `0.7.4-centered-navigation`。底部三项导航的图示与文字现分别在等宽栏内置中。用户已反馈 0.7.2 在一加可用；这是用户实测反馈，不扩大为所有一加机型或完整恢复验证。此版面向 realme／OPPO／OnePlus 共用接口，修复“首个类存在就挡住其他接口”的选择问题：点击启用时自动逐个做只读预检，通过后才备份并设置，不要求先复制诊断。恢复绑定实际使用的接口，不连续试写。**GT Neo 2 / RMX3370 尚未实测，不能宣称已经修好。** 见 [逐品牌兼容性与 realme 核查](docs/vendor-compatibility.md)。原 Redmi 可用为用户反馈；既有证据见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
 
 
 [下载最新版安装包](https://github.com/gujiu502/campustap/releases/latest/download/CampusTap.apk) · [发布说明与校验码](https://github.com/gujiu502/campustap/releases/latest)
