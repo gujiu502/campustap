@@ -5,6 +5,14 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class VendorFailureTest {
+    @Test public void startupRequiresBothCurrentGrantsAndDoesNotRememberOldAuthorization() {
+        assertNull(VendorFailure.authorizationFailure(true, true));
+        assertEquals("PERMISSION_REQUIRED", VendorFailure.authorizationFailure(true, false).code);
+        assertEquals("NFC_PERMISSION_REQUIRED", VendorFailure.authorizationFailure(false, true).code);
+        assertEquals("NFC_PERMISSION_REQUIRED", VendorFailure.authorizationFailure(false, false).code);
+        assertNull(VendorFailure.authorizationFailure(true, true));
+        assertNotNull(VendorFailure.authorizationFailure(true, false));
+    }
     @Test public void distinguishesPermissionFromUnsupportedDevicesAndNfcOff() {
         VendorFailure permission = new VendorFailure("CHECK_PERMISSION", "PERMISSION_REQUIRED", null);
         VendorFailure device = new VendorFailure("CHECK_DEVICE", "UNVERIFIED_DEVICE", null);

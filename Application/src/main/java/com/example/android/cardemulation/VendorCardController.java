@@ -155,9 +155,10 @@ final class VendorCardController {
         if (failure != null) throw failure;
     }
     static VendorFailure readinessFailure(Context context) {
+        VendorFailure authorization = NfcSetup.authorizationFailure(context);
+        if (authorization != null) return authorization;
         if (!RadioConfiguration.verifiedDevice(Build.MODEL, Build.VERSION.INCREMENTAL))
             return new VendorFailure("CHECK_DEVICE", "UNVERIFIED_DEVICE", null);
-        if (!hasSystemPermission(context)) return new VendorFailure("CHECK_PERMISSION", "PERMISSION_REQUIRED", null);
         NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
         if (nfc == null) return new VendorFailure("CHECK_NFC", "NFC_UNAVAILABLE", null);
         return nfc.isEnabled() ? null : new VendorFailure("CHECK_NFC", "NFC_OFF", null);

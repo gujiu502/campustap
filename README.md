@@ -1,9 +1,9 @@
 # CampusTap — 多卡片 NFC 门禁参数管理
 
-2026-10-15，版本 `0.6.1-permission-guide`。已在 Redmi 验证实际贴卡连续添加、点击切换、默认卡启动启用，以及后台锁屏后的配置保留。**用户已确认自己的 Redmi 可以使用；这是用户实测反馈。其他机型未适配，不能将授权成功当作全机型支持。** 见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
+2026-10-15，版本 `0.6.2-startup-authorization`。0.6.0 已在 Redmi 验证实际贴卡连续添加、点击切换、默认卡启动启用，以及后台锁屏后的配置保留；0.6.2 的启动授权关卡尚未真机复测。**用户已确认自己的 Redmi 可以使用；这是用户实测反馈。其他机型未适配，不能将授权成功当作全机型支持。** 见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
 
 
-[下载安装包 CampusTap 0.6.1](https://github.com/gujiu502/campustap/releases/download/v0.6.1/CampusTap-0.6.1.apk) · [发布说明与校验码](https://github.com/gujiu502/campustap/releases/tag/v0.6.1)
+[下载安装包 CampusTap 0.6.2](https://github.com/gujiu502/campustap/releases/download/v0.6.2/CampusTap-0.6.2.apk) · [发布说明与校验码](https://github.com/gujiu502/campustap/releases/tag/v0.6.2)
 
 ## 当前行为
 
@@ -12,7 +12,7 @@
 - 启动 App 自动启用默认卡；NFC 重新开启时尝试启用默认卡。主动暂停会关闭自动启用，直到再次点击卡片。
 - 正常启用后没有两分钟限时，不在离开 App 或熄屏时主动恢复；原配置的加密快照一直保留，供“暂停模拟”核对恢复。没有常驻前台服务或全局保持亮屏。
 - 普通流程没有“门禁测试”或工程参数界面。debug 可长按设置页版本文字进入内部开发页；只读后台探针仅打包到 debug，要求发送方有系统 DUMP 权限。
-- 设置新增“授权与兼容性”：显示本机 NFC、系统授权、机型／ROM 适配状态，提供一次性 ADB 授权步骤、复制指令与重新检查。启动时发现已适配设备缺少授权会主动显示引导。
+- 设置新增“授权与兼容性”：显示本机 NFC、系统授权、机型／ROM 适配状态，提供一次性 ADB 授权步骤、复制指令与重新检查。每次启动及返回前台均先核验基本 NFC 和系统设置授权；未通过停在强制授权关卡并自动显示引导，关闭说明不能绕过。授权通过后才进入卡片页和后续默认卡启用流程。
 - 启用失败区分未授权、未适配、NFC 关闭和配置异常，不再将所有错误归为权限问题。
 - 使用记录展示最近一次设置、恢复和失败，不编造刷卡或开门成功记录。
 
@@ -41,7 +41,7 @@ adb devices -l
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\deploy.ps1 -Serial SERIAL
 ```
 
-发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 19 项 JVM 测试通过，lint 0 errors / 17 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
+发布产物为 Application/build/outputs/apk/release/Application-release.apk；-Distribution 使用本机已有测试签名密钥，不自动创建或下载私钥。普通构建可省略该开关。使用 install -r 保留已录入数据，不先卸载。构建临时使用空闲的 X: ASCII 映射并自动移除。Debug、Release 各 20 项 JVM 测试通过，lint 0 errors / 17 warnings。发布 APK 不可调试且不包含后台 debug 探针。为了兼容已有安装，测试发布保留原 Android Debug 签名；私钥不入库、不上传，后续正式生产签名需单独规划。
 
 | 文件 | 职责 |
 |---|---|

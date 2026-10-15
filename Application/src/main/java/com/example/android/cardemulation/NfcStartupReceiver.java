@@ -11,7 +11,7 @@ import org.json.JSONObject;
 /** Reapply the selected default when NFC becomes available; never change the payment role. */
 public final class NfcStartupReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
-        if (!NfcAdapter.ACTION_ADAPTER_STATE_CHANGED.equals(intent.getAction())
+        if (!NfcSetup.hasAuthorization(context) || !NfcAdapter.ACTION_ADAPTER_STATE_CHANGED.equals(intent.getAction())
                 || intent.getIntExtra(NfcAdapter.EXTRA_ADAPTER_STATE, -1) != NfcAdapter.STATE_ON
                 || !context.getSharedPreferences("nfc-state", Context.MODE_PRIVATE).getBoolean("autoActivate", true)) return;
         NfcAdapter nfc = NfcAdapter.getDefaultAdapter(context);
@@ -19,6 +19,7 @@ public final class NfcStartupReceiver extends BroadcastReceiver {
         PendingResult pending = goAsync();
         VendorCardController.WORKER.execute(() -> {
             try {
+                if (!NfcSetup.hasAuthorization(context)) return;
                 if (!context.getSharedPreferences("nfc-state", Context.MODE_PRIVATE).getBoolean("autoActivate", true)) return;
                 CardStore cards = new CardStore(context);
                 if (cards.defaultId.isEmpty()) return;

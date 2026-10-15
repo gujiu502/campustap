@@ -14,6 +14,10 @@ final class VendorFailure extends Exception {
         return cause instanceof VendorFailure ? (VendorFailure) cause
                 : new VendorFailure(stage, "CALL_FAILED", cause);
     }
+    static VendorFailure authorizationFailure(boolean nfcGranted, boolean systemGranted) {
+        if (!nfcGranted) return new VendorFailure("CHECK_PERMISSION", "NFC_PERMISSION_REQUIRED", null);
+        return systemGranted ? null : new VendorFailure("CHECK_PERMISSION", "PERMISSION_REQUIRED", null);
+    }
     String errorType() {
         Throwable error = getCause();
         while (error instanceof InvocationTargetException && error.getCause() != null) error = error.getCause();
@@ -23,6 +27,7 @@ final class VendorFailure extends Exception {
         if ("SecurityException".equals(errorType()) || "PERMISSION_REQUIRED".equals(code))
             return "尚未取得系統 NFC 設定權限，請查看授權方式並完成一次電腦授權。";
         switch (code) {
+            case "NFC_PERMISSION_REQUIRED": return "尚未取得基本 NFC 權限，請檢查安裝來源並重新安裝完整安裝包。";
             case "NFC_OFF": return "請先開啟 NFC";
             case "NFC_UNAVAILABLE": return "此手機未提供 NFC 功能。";
             case "UNVERIFIED_DEVICE": return "此機型或系統版本尚未支援卡片模擬，並非一般 NFC 權限問題。授權後也需先完成裝置適配。";
@@ -35,5 +40,5 @@ final class VendorFailure extends Exception {
                     ? "目前 NFC 配置與已核驗基線不同，未寫入設定" : "啟用未完成；請在設定檢查授權與裝置相容性，原卡片資料已保留。";
         }
     }
-    boolean needsAuthorization() { return "PERMISSION_REQUIRED".equals(code) || "SecurityException".equals(errorType()); }
+    boolean needsAuthorization() { return "PERMISSION_REQUIRED".equals(code) || "NFC_PERMISSION_REQUIRED".equals(code) || "SecurityException".equals(errorType()); }
 }

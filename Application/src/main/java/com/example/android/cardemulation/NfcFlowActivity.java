@@ -92,7 +92,9 @@ public final class NfcFlowActivity extends Activity implements NfcAdapter.Reader
         note.setGravity(Gravity.CENTER); content.addView(note, margins(20, 0));
     }
     @Override protected void onResume() {
-        super.onResume(); resumed = true;
+        super.onResume();
+        if (!NfcSetup.hasAuthorization(this)) { finish(); return; }
+        resumed = true;
         if ("restore".equals(mode)) {
             getSharedPreferences("nfc-state", MODE_PRIVATE).edit().putBoolean("autoActivate", false).apply(); restore("正在恢復 NFC");
         } else if ("read".equals(mode)) startRead();
