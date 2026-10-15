@@ -22,6 +22,7 @@ import java.io.File;
 final class CardFace extends View {
     private final CardAppearance card;
     private boolean selected;
+    private boolean active;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final TextPaint text = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Drawable campus;
@@ -42,12 +43,13 @@ final class CardFace extends View {
         GradientDrawable background = new GradientDrawable();
         background.setColor(0xFFBDDCF0); background.setCornerRadius(dp(18));
         setBackground(background); setClipToOutline(true); setElevation(dp(5));
-        setContentDescription(card.name + (selected ? "，App 預設測試卡" : "")
+        setContentDescription(card.name + (selected ? "，預設卡片" : "")
                 + (card.linked ? "，已錄入，開門待驗證" : "，外觀卡片，未啟用 NFC"));
     }
     void allowCropDragging() { draggable = true; coverOnly = true; }
     boolean hasImage() { return image != null; }
     void selectDefault(boolean value) { selected = value; invalidate(); }
+    void setActive(boolean value) { active = value; invalidate(); }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         int width = MeasureSpec.getSize(widthSpec);
         setMeasuredDimension(width, Math.round(width / 1.586f));
@@ -93,10 +95,17 @@ final class CardFace extends View {
         paint.setStyle(Paint.Style.FILL);
         if (selected) {
             paint.setColor(0xFF2C70EE);
-            RectF badge = new RectF(width - dp(86) * scale, dp(10) * scale, width - dp(10) * scale, dp(36) * scale);
+            RectF badge = new RectF(width - dp(142) * scale, dp(10) * scale, width - dp(66) * scale, dp(36) * scale);
             canvas.drawRoundRect(badge, dp(13), dp(13), paint);
             text.setColor(Color.WHITE); text.setTextSize(dp(12) * scale);
             canvas.drawText("★  預設", badge.left + dp(10) * scale, badge.top + dp(18) * scale, text);
+        }
+        if (active) {
+            paint.setColor(0xFF2C70EE);
+            RectF badge = new RectF(width - dp(86) * scale, height - dp(38) * scale, width - dp(10) * scale, height - dp(10) * scale);
+            canvas.drawRoundRect(badge, dp(13), dp(13), paint);
+            text.setColor(Color.WHITE); text.setTextSize(dp(12) * scale);
+            canvas.drawText("使用中", badge.left + dp(16) * scale, badge.top + dp(19) * scale, text);
         }
     }
     @Override public boolean onTouchEvent(MotionEvent event) {

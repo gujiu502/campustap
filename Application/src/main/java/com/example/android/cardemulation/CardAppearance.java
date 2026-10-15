@@ -1,6 +1,12 @@
 package com.example.android.cardemulation;
 
 final class CardAppearance {
+    static String profileFile(String id) {
+        if ("access".equals(id)) return "access_card.enc";
+        if (id == null || !id.matches("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"))
+            throw new IllegalArgumentException("Invalid card identifier");
+        return "card-" + id + ".enc";
+    }
     String id, name, type, image = "";
     boolean linked, autoCrop = true;
     float zoom = 1, panX, panY;

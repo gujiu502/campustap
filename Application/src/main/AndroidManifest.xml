@@ -11,6 +11,10 @@
         android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
         <uses-library android:name="com.st.android.nfc_extensions" android:required="false" />
         <activity android:name=".MainActivity" android:exported="false" />
+        <activity android:name=".NfcFlowActivity" android:exported="false" />
+        <receiver android:name=".NfcStartupReceiver" android:exported="true" android:permission="android.permission.WRITE_SECURE_SETTINGS">
+            <intent-filter><action android:name="android.nfc.action.ADAPTER_STATE_CHANGED" /></intent-filter>
+        </receiver>
         <activity android:name=".CardsActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

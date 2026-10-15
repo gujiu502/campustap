@@ -12,10 +12,17 @@ final class RadioConfiguration {
             byte[] expected = id == 0x30 ? new byte[]{4} : id == 0x31 ? new byte[]{0}
                     : id == 0x32 ? new byte[]{32} : new byte[0];
             byte[] actual = nci.get(id);
+            if (id == 0x33 && dynamicUid(actual)) continue;
+            if (id == 0x58 && Arrays.equals(actual, new byte[]{0x70})) continue;
             if (!Arrays.equals(actual, expected))
                 throw new VendorFailure("CHECK_BASELINE", "NCI_" + Integer.toHexString(id).toUpperCase(java.util.Locale.ROOT)
                         + "_BASELINE_MISMATCH", null);
         }
+    }
+    static boolean dynamicUid(byte[] uid) { return uid != null && uid.length == 4 && uid[0] == 0x08; }
+    static boolean restoredParameter(int id, byte[] before, byte[] after) {
+        // In controller dynamic mode, restoring discovery can generate a different random UID.
+        return id == 0x33 && dynamicUid(before) ? dynamicUid(after) : Arrays.equals(before, after);
     }
     static void requireEnabled(byte[] controller, Map<Integer, byte[]> nci, AccessCardProfile profile) throws VendorFailure {
         if (controller == null || controller.length < 82 || controller[20] != 4 || controller[26] != profile.sak

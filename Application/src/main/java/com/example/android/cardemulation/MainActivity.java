@@ -38,8 +38,9 @@ public class MainActivity extends Activity implements NfcAdapter.ReaderCallback 
     private TextView capability, card, readerState;
     private TextView accessState;
     private VendorCardController vendorController;
-    private final ExecutorService vendorWorker = Executors.newSingleThreadExecutor();
+    private final ExecutorService vendorWorker = VendorCardController.WORKER;
     private volatile boolean resumed;
+    private boolean backendTest;
     private final Runnable vendorTimeout = this::stopVendorTest;
     private volatile boolean scanning = false;
     private volatile boolean testReader = false;
@@ -103,7 +104,7 @@ public class MainActivity extends Activity implements NfcAdapter.ReaderCallback 
         super.onResume();
         resumed = true;
         refreshCapabilities();
-        if (vendorController.recoveryRequired()) {
+        if (vendorController.recoveryRequired() && VendorCardController.activeCardId(this).isEmpty()) {
             initialProbe = false;
             stopVendorTest();
         }
@@ -114,18 +115,17 @@ public class MainActivity extends Activity implements NfcAdapter.ReaderCallback 
         }
         if (initialProbe) {
             initialProbe = false;
-            if (adapter != null && adapter.isEnabled()) startScan(false);
+            if (VendorCardController.activeCardId(this).isEmpty() && adapter != null && adapter.isEnabled()) startScan(false);
         }
     }
     @Override protected void onPause() {
         resumed = false;
         handler.removeCallbacks(vendorTimeout);
         stopScan("偵測已停止；離開前景時恢復正常 NFC 路由");
-        stopVendorTest();
+        if (backendTest || VendorCardController.activeCardId(this).isEmpty()) stopVendorTest();
         super.onPause();
     }
     @Override protected void onDestroy() {
-        vendorWorker.shutdown();
         super.onDestroy();
     }
     private void confirmVendorTest() {
@@ -139,6 +139,7 @@ public class MainActivity extends Activity implements NfcAdapter.ReaderCallback 
     }
     private void enableVendorTest() {
         stopScan("讀卡模式已停止；準備門禁測試");
+        backendTest = true;
         accessState.setText("正在設定並核對控制器參數…");
         vendorWorker.execute(() -> {
             if (!resumed) return;
@@ -149,6 +150,7 @@ public class MainActivity extends Activity implements NfcAdapter.ReaderCallback 
                 runOnUiThread(() -> {
                     if (!resumed) return;
                     accessState.setText("測試模式已啟用；開門結果待實測");
+                    getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                     handler.removeCallbacks(vendorTimeout);
                     handler.postDelayed(vendorTimeout, 120_000);
                 });
@@ -164,6 +166,8 @@ public class MainActivity extends Activity implements NfcAdapter.ReaderCallback 
         });
     }
     private void stopVendorTest() {
+        backendTest = false;
+        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         handler.removeCallbacks(vendorTimeout);
         vendorWorker.execute(() -> {
             try {

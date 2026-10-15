@@ -24,4 +24,11 @@ public class CardAppearanceTest {
         assertThrows(IllegalArgumentException.class, () -> CardAppearance.crop(0, 10, 20, 30, 1, 0, 0));
         assertThrows(IllegalArgumentException.class, () -> CardAppearance.crop(10, 10, 20, 30, Float.NaN, 0, 0));
     }
+    @Test public void keepsCardProfilesIndependentAndPreservesLegacyFile() {
+        assertEquals("access_card.enc", CardAppearance.profileFile("access"));
+        String first = java.util.UUID.randomUUID().toString(), second = java.util.UUID.randomUUID().toString();
+        assertNotEquals(CardAppearance.profileFile(first), CardAppearance.profileFile(second));
+        for (String id : new String[]{null, "", "../access", "card/secret", "BAD-ID"})
+            assertThrows(IllegalArgumentException.class, () -> CardAppearance.profileFile(id));
+    }
 }

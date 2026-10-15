@@ -17,16 +17,23 @@ final class CardStore {
         JSONArray json = new JSONArray(preferences.getString("cards", "[]"));
         for (int i = 0; i < json.length(); i++) cards.add(decode(json.getJSONObject(i)));
     }
-    void syncProfile(boolean exists) throws Exception {
-        boolean found = false, changed = false;
+    void syncProfiles(Context context) throws Exception {
+        boolean changed = false;
+        java.util.Set<String> known = new java.util.HashSet<>();
         for (int i = cards.size() - 1; i >= 0; i--) {
             CardAppearance card = cards.get(i);
             if (!card.linked) continue;
-            if (exists) found = true;
+            if (new VendorCardController(context, card.id).hasProfile()) known.add(card.id);
             else { cards.remove(i); changed = true; if (card.id.equals(defaultId)) defaultId = ""; }
         }
-        if (exists && !found) {
+        if (new VendorCardController(context).hasProfile() && !known.contains("access")) {
             cards.add(0, new CardAppearance("access", "宿舍門禁卡", "access", true)); changed = true;
+        }
+        String[] files = context.getFilesDir().list();
+        if (files != null) for (String name : files) {
+            if (!name.matches("card-[a-f0-9-]{36}\\.enc")) continue;
+            String id = name.substring(5, name.length() - 4);
+            if (!known.contains(id)) { CardAppearance.profileFile(id); cards.add(new CardAppearance(id, "門禁卡", "access", true)); changed = true; }
         }
         if (changed) save();
     }
@@ -52,7 +59,7 @@ final class CardStore {
                 || (!image.isEmpty() && !image.matches("cover-[a-f0-9-]{36}\\.png")))
             throw new IllegalArgumentException("Invalid card appearance");
         CardAppearance card = new CardAppearance(id, json.getString("name"), type, json.getBoolean("linked"));
-        if (card.linked && !"access".equals(id)) throw new IllegalArgumentException("Invalid linked profile");
+        if (card.linked) CardAppearance.profileFile(id);
         card.image = image; card.autoCrop = json.optBoolean("autoCrop", true);
         card.zoom = (float) json.optDouble("zoom", 1); card.panX = (float) json.optDouble("panX", 0); card.panY = (float) json.optDouble("panY", 0);
         if (!Float.isFinite(card.zoom + card.panX + card.panY)) throw new IllegalArgumentException("Invalid crop");

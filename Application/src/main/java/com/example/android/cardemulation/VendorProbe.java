@@ -39,6 +39,7 @@ public final class VendorProbe {
                     operations.put("getNciConfig(" + Integer.toHexString(parameter) + ")");
                     byte[] value = (byte[]) extension.getMethod("getNciConfig", int.class).invoke(controller, parameter);
                     lengths.put(Integer.toHexString(parameter), value == null ? JSONObject.NULL : value.length);
+                    if (parameter == 0x33) report.put("nciUidHasRandomFormat", RadioConfiguration.dynamicUid(value));
                     if (parameter == 0x33 || parameter == 0x59) continue; // Do not export UID or historical card bytes.
                     JSONArray bytes = new JSONArray();
                     if (value != null) for (byte element : value) bytes.put(element & 0xFF);

@@ -28,6 +28,8 @@ import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.FrameLayout;
+import android.widget.PopupMenu;
 import android.widget.Toast;
 import android.util.AtomicFile;
 import org.json.JSONObject;
@@ -47,6 +49,8 @@ public final class CardsActivity extends Activity {
     private String page = "cards", pendingImage = "";
     private Dialog sheet;
     private boolean recoveryOpened;
+    private boolean applyDefaultOnResume = true, activationBusy, visible;
+    private String activationMessage = "";
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
@@ -61,20 +65,27 @@ public final class CardsActivity extends Activity {
             }
         } catch (Exception error) {
             new AlertDialog.Builder(this).setTitle("卡片資料載入失敗")
-                    .setMessage("原資料已保留。請返回後重試；NFC 復原仍可從診斷頁執行。")
-                    .setPositiveButton("NFC 診斷", (d,w) -> openDiagnostics(false)).setNegativeButton("返回", (d,w) -> finish()).show();
+                    .setMessage("原資料已保留。請返回後重試；也可以先恢復 NFC。")
+                    .setPositiveButton("恢復 NFC", (d,w) -> openFlow("restore", null)).setNegativeButton("返回", (d,w) -> finish()).show();
         }
     }
     @Override protected void onResume() {
         super.onResume();
+        visible = true;
         if (store == null) return;
-        try { store.syncProfile(new VendorCardController(this).hasProfile()); }
+        try { store = new CardStore(this); store.syncProfiles(this); }
         catch (Exception error) { message("卡片同步失敗；原資料已保留"); }
         if (draft != null) showEditor(); else showPage(page);
-        if (!recoveryOpened && new VendorCardController(this).recoveryRequired()) {
-            recoveryOpened = true; openDiagnostics(false);
+        if (applyDefaultOnResume) {
+            applyDefaultOnResume = false;
+            if (!store.defaultId.isEmpty() && getSharedPreferences("nfc-state", MODE_PRIVATE).getBoolean("autoActivate", true)) activateCard(store.defaultId);
+        }
+        if (!activationBusy && !recoveryOpened && new VendorCardController(this).recoveryRequired()
+                && VendorCardController.activeCardId(this).isEmpty()) {
+            recoveryOpened = true; openFlow("restore", null);
         }
     }
+    @Override protected void onPause() { visible = false; super.onPause(); }
     @Override protected void onSaveInstanceState(Bundle saved) {
         super.onSaveInstanceState(saved);
         saved.putString("page", page); saved.putString("pendingImage", pendingImage); saved.putBoolean("draftDefault", draftDefault);
@@ -141,16 +152,59 @@ public final class CardsActivity extends Activity {
         }
         for (CardAppearance card : store.cards) {
             CardFace face = new CardFace(this, card, card.id.equals(store.defaultId));
-            face.setOnClickListener(v -> edit(card)); face.setFocusable(true);
-            body.addView(face, spaced(-1, -2, 0, 20));
+            face.setActive(card.id.equals(VendorCardController.activeCardId(this)));
+            face.setOnClickListener(v -> activateCard(card.id)); face.setFocusable(true);
+            FrameLayout frame = new FrameLayout(this); frame.setClipChildren(false); frame.setClipToPadding(false);
+            frame.addView(face, new FrameLayout.LayoutParams(-1, -2));
+            TextView more = icon("⋮", card.name + "更多選項", () -> { });
+            more.setTextSize(28); more.setBackground(ripple(0xCCFFFFFF, 24)); more.setElevation(dp(8));
+            more.setOnClickListener(v -> showCardMenu(more, card));
+            FrameLayout.LayoutParams menuParams = new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP | Gravity.END);
+            menuParams.topMargin = dp(4); menuParams.rightMargin = dp(4); frame.addView(more, menuParams);
+            body.addView(frame, spaced(-1, -2, 0, 20));
         }
         LinearLayout state = panel();
-        boolean recovery = new VendorCardController(this).recoveryRequired();
-        String last = getSharedPreferences("diagnostics", MODE_PRIVATE).getString("vendorFailure", "");
-        state.addView(label(recovery ? "NFC 需要恢復" : "開門待驗證", 16, recovery ? 0xFFB54708 : INK, true));
-        state.addView(label(last.isEmpty() ? "已錄入不等於已能開門。測試卡選擇僅限本 App，系統預設錢包保持不變。" : last, 13, MUTED, false));
-        state.addView(action(recovery ? "恢復 NFC／查看診斷" : "測試門禁", true, () -> openDiagnostics(!recovery)));
+        String active = VendorCardController.activeCardId(this);
+        boolean configured = new VendorCardController(this).recoveryRequired();
+        state.addView(label(activationBusy ? "正在切換卡片…" : !active.isEmpty() ? "卡片已啟用" : "尚未啟用卡片", 16, INK, true));
+        state.addView(label(!activationMessage.isEmpty() ? activationMessage : "點卡片即可啟用，右上角三點可編輯。NFC 付款前請暫停模擬；熄屏開門仍需實際驗證。", 13, MUTED, false));
+        if (configured) state.addView(action("暫停模擬", false, () -> openFlow("restore", null)));
+        else if (!store.defaultId.isEmpty()) state.addView(action("啟用預設卡片", true, () -> activateCard(store.defaultId)));
         body.addView(state);
+    }
+    private void showCardMenu(View anchor, CardAppearance card) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(0, 1, 0, "編輯卡片");
+        if (card.linked) menu.getMenu().add(0, 2, 1, card.id.equals(store.defaultId) ? "目前為預設卡" : "設為預設卡片");
+        menu.getMenu().add(0, 3, 2, "刪除卡片");
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) edit(card);
+            else if (item.getItemId() == 2) {
+                String previous = store.defaultId; store.defaultId = card.id;
+                try { store.save(); activateCard(card.id); } catch (Exception error) { store.defaultId = previous; message("預設卡片儲存失敗"); }
+            } else confirmDelete(card);
+            return true;
+        }); menu.show();
+    }
+    private void activateCard(String id) {
+        if (activationBusy) return;
+        CardAppearance selected = null;
+        for (CardAppearance card : store.cards) if (card.id.equals(id)) selected = card;
+        if (selected == null || !selected.linked) { message("此卡片尚未錄入 NFC 資料"); return; }
+        activationBusy = true; activationMessage = "正在啟用「" + selected.name + "」…";
+        if (draft == null) showPage(page);
+        VendorCardController.WORKER.execute(() -> {
+            try {
+                JSONObject report = new VendorCardController(this, id).activate();
+                try (FileOutputStream output = openFileOutput("vendor_test_enable.json", MODE_PRIVATE)) { output.write(report.toString(2).getBytes(StandardCharsets.UTF_8)); }
+                getSharedPreferences("nfc-state", MODE_PRIVATE).edit().putBoolean("autoActivate", true).apply();
+                activationMessage = "已啟用所選卡片，離開軟體後保留。熄屏開門請以實際門禁結果為準。";
+            } catch (Exception error) {
+                activationMessage = "暫時無法啟用，請確認 NFC 已開啟且手機已完成授權。";
+                try { new VendorCardController(this, id).restore(); } catch (Exception ignored) { }
+            }
+            runOnUiThread(() -> { activationBusy = false; if (visible && draft == null) showPage(page); });
+        });
     }
     private void showAddSheet() {
         sheet = new Dialog(this); sheet.requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -161,8 +215,8 @@ public final class CardsActivity extends Activity {
         LinearLayout heading = row(); heading.setGravity(Gravity.CENTER_VERTICAL);
         heading.addView(label("新增卡片", 28, INK, true), new LinearLayout.LayoutParams(0, dp(52), 1));
         heading.addView(icon("×", "關閉新增卡片", () -> sheet.dismiss()), new LinearLayout.LayoutParams(dp(48), dp(48))); content.addView(heading);
-        addType(content, "▣", "門禁卡", "讀取本人門卡識別參數，開門需實測", 0xFFE7F0FE, 0xFF639DE5, () -> openDiagnostics(false));
-        addType(content, "◇", "學生證", "建立學生證卡面，門禁由錄入頁測試", 0xFFE4F3EF, 0xFF4FAC97, () -> createAppearance("student"));
+        addType(content, "▣", "門禁卡", "貼近手機，自動讀取並添加", 0xFFE7F0FE, 0xFF639DE5, () -> openFlow("read", "access"));
+        addType(content, "◇", "學生證", "貼近手機，添加學生證門禁功能", 0xFFE4F3EF, 0xFF4FAC97, () -> openFlow("read", "student"));
         addType(content, "▤", "交通卡", "原實體悠遊卡加入尚未支援", 0xFFFFF0E4, 0xFFFF9654,
                 () -> new AlertDialog.Builder(this).setTitle("交通卡尚未支援").setMessage("目前無法將原實體悠遊卡加入此手機。此入口不會開啟或更動悠遊付。")
                         .setPositiveButton("知道了", null).show());
@@ -214,13 +268,9 @@ public final class CardsActivity extends Activity {
             draft.autoCrop = false; showCrop();
         })); body.addView(form, spaced(-1, -2, 0, 14));
         LinearLayout defaults = panel();
-        defaults.addView(toggle("設為預設 NFC 卡片", draft.linked ? "僅選為本 App 測試卡；系統預設仍取決於裝置支援"
+        defaults.addView(toggle("設為預設 NFC 卡片", draft.linked ? "軟體啟動時自動啟用此卡，不改變付款錢包"
                 : "此卡僅管理外觀，尚未具備 NFC 感應功能", draftDefault, draft.linked, value -> { draftDefault = value; preview.selectDefault(value); }));
         body.addView(defaults, spaced(-1, -2, 0, 14));
-        if (draft.linked) body.addView(action("測試門禁／恢復 NFC", false, () -> {
-            new AlertDialog.Builder(this).setMessage("先儲存卡面變更後再測試。NFC 測試不會自動套用系統預設卡。")
-                    .setPositiveButton("知道了", null).show();
-        }));
         if (store.cards.stream().anyMatch(card -> card.id.equals(draft.id))) body.addView(action("刪除卡片", false, this::confirmDelete));
         Button save = action("儲存", true, this::saveDraft); LinearLayout.LayoutParams params = spaced(-1, dp(56), 8, 12); params.leftMargin = dp(20); params.rightMargin = dp(20);
         root.addView(save, params);
@@ -282,19 +332,23 @@ public final class CardsActivity extends Activity {
             try { store.save(); } catch (Exception error) { store.cards.clear(); store.cards.addAll(previous); store.defaultId = previousDefault; throw error; }
             pendingImage = ""; if (!previousImage.equals(draft.image)) removeUnusedCover(previousImage);
             draft = null; showPage("cards"); message("卡片已儲存");
+            if (!previousDefault.equals(store.defaultId) && !store.defaultId.isEmpty()) activateCard(store.defaultId);
         } catch (Exception error) { message(error instanceof IllegalArgumentException ? "卡片名稱需為 1–32 個字" : "儲存失敗；原卡片資料已保留"); }
     }
     private void confirmDelete() {
+        confirmDelete(draft);
+    }
+    private void confirmDelete(CardAppearance target) {
         new AlertDialog.Builder(this).setTitle("刪除這張卡片？")
-                .setMessage(draft.linked ? "會先恢復 NFC，再刪除本 App 加密保存的門卡識別參數；不修改實體卡。" : "只會刪除此 App 的卡片外觀與圖片。")
+                .setMessage(target.linked ? "會刪除此卡片的加密資料；若它正在使用，會先暫停模擬。不修改實體卡。" : "只會刪除此 App 的卡片外觀與圖片。")
                 .setNegativeButton("取消", null).setPositiveButton("刪除", (d,w) -> {
                     try {
-                        if (draft.linked) new VendorCardController(this).forgetProfile();
+                        if (target.linked) new VendorCardController(this, target.id).forgetProfile();
                         java.util.List<CardAppearance> previous = new java.util.ArrayList<>(store.cards); String selected = store.defaultId;
-                        store.cards.removeIf(card -> card.id.equals(draft.id)); if (draft.id.equals(store.defaultId)) store.defaultId = "";
+                        store.cards.removeIf(card -> card.id.equals(target.id)); if (target.id.equals(store.defaultId)) store.defaultId = "";
                         try { store.save(); } catch (Exception error) { store.cards.clear(); store.cards.addAll(previous); store.defaultId = selected; throw error; }
-                        removeUnusedCover(draft.image); discardPendingImage(); draft = null; showPage("cards");
-                    } catch (Exception error) { message("刪除或 NFC 恢復失敗；請到設定查看診斷"); }
+                        removeUnusedCover(target.image); discardPendingImage(); draft = null; showPage("cards");
+                    } catch (Exception error) { message("刪除未完成；請先到設定恢復 NFC"); }
                 }).show();
     }
     private void removeUnusedCover(String name) {
@@ -307,33 +361,42 @@ public final class CardsActivity extends Activity {
         pendingImage = "";
     }
     private void showHistory() {
-        body.addView(label("僅記錄 App 設定測試；不推定已開門", 14, MUTED, false), spaced(-1, -2, 0, 18));
+        body.addView(label("卡片切換與 NFC 恢復紀錄", 14, MUTED, false), spaced(-1, -2, 0, 18));
         boolean found = false;
-        for (String name : new String[]{"vendor_test_failure.json", "vendor_test_restore.json", "vendor_test_enable.json"}) {
+        String[] reports = {"vendor_test_failure.json", "vendor_test_restore.json", "vendor_test_enable.json"};
+        java.util.Arrays.sort(reports, (first, second) -> Long.compare(
+                getFileStreamPath(second).lastModified(), getFileStreamPath(first).lastModified()));
+        for (String name : reports) {
             File file = getFileStreamPath(name); if (!file.exists()) continue;
             try {
                 if (file.length() > 16384) throw new IllegalStateException("Report too large");
                 JSONObject report = new JSONObject(new String(java.nio.file.Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8));
                 LinearLayout item = panel();
-                String operation = report.optString("operation"), title = "RESTORE".equals(operation) ? "恢復 NFC" : "ENABLE_TEST".equals(operation) ? "門禁測試設定" : "測試失敗";
-                item.addView(label(title + " · " + report.optString("result", report.optString("controllerReadback", "待核對")), 17, INK, true));
+                String operation = report.optString("operation"), title = "RESTORE".equals(operation) ? "恢復 NFC" : "ENROLL".equals(operation) ? "添加卡片" : "啟用卡片";
+                boolean pass = "PASS".equals(report.optString("result", report.optString("controllerReadback")));
+                item.addView(label(title + " · " + (pass ? "已完成" : "未完成"), 17, INK, true));
                 long timestamp = report.optLong("observedAt", 0);
                 if (timestamp > 0) item.addView(label(android.text.format.DateFormat.format("MM/dd HH:mm", timestamp).toString(), 13, MUTED, false));
-                if (report.has("stage")) item.addView(label(report.optString("stage") + "\n" + report.optString("reasonCode"), 13, MUTED, false));
                 item.addView(label("開門結果：尚未驗證", 13, MUTED, false)); body.addView(item, spaced(-1, -2, 0, 12)); found = true;
             } catch (Exception error) { body.addView(label("一筆診斷未能載入；檔案已保留", 13, MUTED, false)); }
         }
-        if (!found) { body.addView(label("尚無測試紀錄", 22, INK, true)); body.addView(label("實際門禁測試後，設定與恢復結果會顯示於此。", 14, MUTED, false)); }
+        if (!found) { body.addView(label("尚無使用紀錄", 22, INK, true)); body.addView(label("卡片啟用與暫停結果會顯示於此。", 14, MUTED, false)); }
     }
     private void showSettings() {
         LinearLayout status = panel(); status.addView(label("NFC 與門禁", 20, INK, true));
-        status.addView(label("目前為無 Root 的本機測試版。卡號匹配不等於通過門禁認證；原實體悠遊卡加入仍未支援。", 14, MUTED, false));
-        status.addView(action("NFC 診斷與恢復", true, () -> openDiagnostics(false))); body.addView(status, spaced(-1, -2, 0, 16));
+        status.addView(label("是否能開門，請以現場門禁結果為準。目前不支援添加原實體悠遊卡的支付功能。", 14, MUTED, false));
+        status.addView(action("暫停模擬並恢復 NFC", true, () -> openFlow("restore", null))); body.addView(status, spaced(-1, -2, 0, 16));
         LinearLayout privacy = panel(); privacy.addView(label("卡片資料與預設", 18, INK, true));
-        privacy.addView(label("門卡識別參數使用 AndroidKeyStore 加密保存在本 App。卡面圖片留在手機，不上傳。預設選擇僅限 App 測試卡，不會更改系統付款錢包或悠遊付。", 14, MUTED, false));
-        privacy.addView(label("CampusTap · " + BuildConfig.VERSION_NAME, 13, MUTED, false)); body.addView(privacy);
+        privacy.addView(label("每張門卡分別加密保存在本機，卡面圖片不會上傳。啟動時自動使用預設卡片；不改變手機付款錢包或悠遊付。", 14, MUTED, false));
+        TextView version = label("CampusTap · " + BuildConfig.VERSION_NAME, 13, MUTED, false);
+        if (BuildConfig.DEBUG) version.setOnLongClickListener(v -> { startActivity(new Intent(this, MainActivity.class)); return true; });
+        privacy.addView(version); body.addView(privacy);
     }
-    private void openDiagnostics(boolean test) { startActivity(new Intent(this, MainActivity.class).putExtra("accessTest", test)); }
+    private void openFlow(String mode, String type) {
+        if ("read".equals(mode)) applyDefaultOnResume = true;
+        recoveryOpened = true; // The flow owns its asynchronous restore when returning here.
+        startActivity(new Intent(this, NfcFlowActivity.class).putExtra("mode", mode).putExtra("cardType", type));
+    }
     private LinearLayout column() { LinearLayout layout = new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL); return layout; }
     private LinearLayout row() { LinearLayout layout = new LinearLayout(this); layout.setOrientation(LinearLayout.HORIZONTAL); return layout; }
     private LinearLayout panel() { LinearLayout layout = column(); layout.setBackground(round(Color.WHITE, 18)); layout.setPadding(dp(18), dp(12), dp(18), dp(14)); return layout; }

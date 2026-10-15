@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Adapted from AOSP CardEmulation (Apache-2.0). Synthetic test AID only. -->
 <host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:description="@string/campus_test_service" android:requireDeviceUnlock="true"
-    android:requireDeviceScreenOn="true">
+    android:description="@string/campus_test_service" android:requireDeviceUnlock="false"
+    android:requireDeviceScreenOn="false">
     <aid-group android:description="@string/campus_test_service" android:category="other">
         <aid-filter android:name="F043414D505553" />
     </aid-group>

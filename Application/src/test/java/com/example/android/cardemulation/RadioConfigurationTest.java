@@ -50,4 +50,21 @@ public class RadioConfigurationTest {
         nci.put(0x30, new byte[]{0});
         assertThrows(VendorFailure.class, () -> RadioConfiguration.requireEnabled(bytes, nci, profile));
     }
+    @Test public void acceptsObservedDynamicUidAndDefaultAtsOnlyInDynamicMode() throws Exception {
+        Map<Integer, byte[]> nci = parameters();
+        nci.put(0x33, new byte[]{8, 1, 2, 3}); nci.put(0x58, new byte[]{0x70});
+        RadioConfiguration.requireBaseline(baseline(), nci);
+        byte[] fixed = baseline(); fixed[20] = 4;
+        assertThrows(VendorFailure.class, () -> RadioConfiguration.requireBaseline(fixed, nci));
+        nci.put(0x33, new byte[]{4, 1, 2, 3});
+        assertThrows(VendorFailure.class, () -> RadioConfiguration.requireBaseline(baseline(), nci));
+        nci.put(0x33, new byte[]{8, 1, 2, 3}); nci.put(0x58, new byte[]{0x71});
+        assertThrows(VendorFailure.class, () -> RadioConfiguration.requireBaseline(baseline(), nci));
+    }
+    @Test public void restoresDynamicUidModeWithoutDemandingTheSameRandomIdentity() {
+        assertTrue(RadioConfiguration.restoredParameter(0x33, new byte[]{8,1,2,3}, new byte[]{8,4,5,6}));
+        assertFalse(RadioConfiguration.restoredParameter(0x33, new byte[]{8,1,2,3}, new byte[]{4,4,5,6}));
+        assertFalse(RadioConfiguration.restoredParameter(0x33, new byte[0], new byte[]{8,4,5,6}));
+        assertFalse(RadioConfiguration.restoredParameter(0x58, new byte[]{0x70}, new byte[]{0}));
+    }
 }
