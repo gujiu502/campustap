@@ -3,7 +3,7 @@
 2026-10-15，版本 `0.6.2-startup-authorization`。0.6.0 已在 Redmi 验证实际贴卡连续添加、点击切换、默认卡启动启用，以及后台锁屏后的配置保留；0.6.2 的启动授权关卡尚未真机复测。**用户已确认自己的 Redmi 可以使用；这是用户实测反馈。其他机型未适配，不能将授权成功当作全机型支持。** 见 [实机报告](docs/live-device-test.md)、[验证矩阵](docs/test-matrix.md)。
 
 
-[下载安装包 CampusTap 0.6.2](https://github.com/gujiu502/campustap/releases/download/v0.6.2/CampusTap-0.6.2.apk) · [发布说明与校验码](https://github.com/gujiu502/campustap/releases/tag/v0.6.2)
+[下载最新版安装包](https://github.com/gujiu502/campustap/releases/latest/download/CampusTap.apk) · [发布说明与校验码](https://github.com/gujiu502/campustap/releases/latest)
 
 ## 当前行为
 
@@ -63,3 +63,5 @@ UI 依据用户三屏模板与 NFC_Card_App_UI_Design_Spec.md，见 [DESIGN.md](
 NFC 付款前先在 App 暂停模拟并确认恢复成功。若恢复失败，请保持 NFC 开启与授权，不卸载、清数据或删除恢复文件。启用期间的 radio_rollback.enc 是必要恢复数据，不是日志。
 
 App 进程退出时配置可继续保留；设备重启、NFC 服务重启、ROM 更新仍可能重置硬件。当前只在启动 App 或 NFC 开启时尝试应用默认卡，不承诺所有整机重启情形。系统选图持久化与完整手动裁切手势尚未实机验收，真实支付未测。
+
+发布约定：每个可下载的最新版 Release 都附带固定名称 CampusTap.apk，并标记为 Latest；保留带版本号的安装包方便历史下载。固定最新版地址无需随版本更换。
